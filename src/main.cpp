@@ -1,21 +1,24 @@
 #include <iostream>
 #include <string>
+#include "FileInfo/FileInfo.h"
+#include "GlobalRoute.h"
 
 int main() {
     std::string input;
     
     while (true) {
-        std::cout << "请输入命令 (输入 'quit' 退出): ";
+        std::cout << "Enter command (type 'quit' to exit): ";
         std::getline(std::cin, input);
         
         if (input == "quit") {
             break;
         }
+
+        GlobalRoute::getInstance().processCommand(input);
         
-        // 处理输入的命令
-        std::cout << "您输入的是: " << input << std::endl;
+        std::cout << "You entered: " << input << std::endl;
     }
     
-    std::cout << "程序已退出" << std::endl;
+    std::cout << "Program terminated." << std::endl;
     return 0;
-} 
+}   
