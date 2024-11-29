@@ -8,11 +8,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 收集源文件
 set(SOURCES
     src/main.cpp
-    src/FileInfo/FileInfo.h
     src/FileInfo/FileInfo.cpp
-    src/MemMonitor/MemMonitor.h
     src/MemMonitor/MemMonitor.cpp
-    src/GlobalRoute.h
+    src/MemMonitor/MemCommandHandler.cpp
     src/GlobalRoute.cpp
 )
 

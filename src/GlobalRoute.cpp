@@ -1,8 +1,6 @@
 #include "GlobalRoute.h"
-
 #include <iostream>
-
-#include "MemMonitor.h"
+#include "MemMonitor/MemCommandHandler.h"
 #include "FileInfo.h"
 
 GlobalRoute& GlobalRoute::getInstance() {
@@ -12,27 +10,23 @@ GlobalRoute& GlobalRoute::getInstance() {
 
 void GlobalRoute::processCommand(const std::string& command) {
     if (command == "mem") {
-        MemMonitor memMonitor;
-        std::cout << memMonitor.getMemOverview() << std::endl;
+        MemCommandHandler::handleMemoryCommands();
     }
     else if (command == "file") {
         FileInfo fileInfo;
         // File information processing
     }
     else if (command == "disk") {
-        // Disk information processing
-        std::cout << "Disk information feature not yet implemented" << std::endl; 
+        std::cout << "Disk information feature not yet implemented\n";
     }
     else if (command == "network") {
-        // Network information processing
-        std::cout << "Network information feature not yet implemented" << std::endl;
+        std::cout << "Network information feature not yet implemented\n";
     }
     else {
-        std::cout << "Unknown command, available commands:\n";
-        std::cout << "mem - Display memory information\n";
-        std::cout << "file - Display file information\n"; 
-        std::cout << "disk - Display disk information\n";
-        std::cout << "network - Display network information" << std::endl;
+        std::cout << "Unknown command, available commands:\n"
+                 << "mem - Display memory information\n"
+                 << "file - Display file information\n"
+                 << "disk - Display disk information\n"
+                 << "network - Display network information\n";
     }
-    
 }
