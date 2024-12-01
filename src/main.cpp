@@ -5,9 +5,10 @@
 #include "patterns/chain.hpp"
 #include "patterns/command.hpp"
 #include "patterns/strategy.hpp"
+#include "patterns/state.hpp"
 
 int main() 
 {
-    testStrategy();
+    testState();
     return 0;
 }   
