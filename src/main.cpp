@@ -6,9 +6,10 @@
 #include "patterns/command.hpp"
 #include "patterns/strategy.hpp"
 #include "patterns/state.hpp"
+#include "patterns/adapter.hpp"
 
 int main() 
 {
-    testState();
+    testAdapter();
     return 0;
 }   
