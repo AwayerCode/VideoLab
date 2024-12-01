@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 #include <list>
+
 class SpliceBase {
 public:
     virtual std::string execute(const std::list<std::string>& params) = 0;
+    virtual ~SpliceBase() = default;
 };
 
 class SpliceSpace : public SpliceBase {
@@ -38,8 +40,9 @@ public:
 
 class Context {
 public:
-    void addStrategy(std::shared_ptr<SpliceBase> strategy) {
+    Context& addStrategy(std::shared_ptr<SpliceBase> strategy) {
         strategies.push_back(std::move(strategy));
+        return *this;
     }
 
     void executeStrategy(const std::list<std::string>& params) {
@@ -55,7 +58,7 @@ private:
 
 void testStrategy() {
     auto context = Context();
-    context.addStrategy(std::make_shared<SpliceSpace>());
-    context.addStrategy(std::make_shared<SpliceUnderline>());
+    context.addStrategy(std::make_shared<SpliceSpace>())
+        .addStrategy(std::make_shared<SpliceUnderline>());
     context.executeStrategy({"Hello", "World"});
 }
