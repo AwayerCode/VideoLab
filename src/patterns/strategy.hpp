@@ -4,48 +4,58 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-class StrategyBase {
+#include <list>
+class SpliceBase {
 public:
-    virtual void execute() = 0;
+    virtual std::string execute(const std::list<std::string>& params) = 0;
 };
 
-class StrategyA : public StrategyBase {
+class SpliceSpace : public SpliceBase {
 public:
-    void execute() override {
-        std::cout << "StrategyA execute" << std::endl;
+    std::string execute(const std::list<std::string>& params) override {
+        std::cout << "SpliceSpace execute" << std::endl;
+        std::string result = "";
+        for (const auto& param : params) {
+            result += param + " ";
+        }
+
+        return result;
     }
 };
 
-class StrategyB : public StrategyBase {
+class SpliceUnderline : public SpliceBase {
 public:
-    void execute() override {
-        std::cout << "StrategyB execute" << std::endl;
+    std::string execute(const std::list<std::string>& params) override {
+        std::cout << "SpliceUnderline execute" << std::endl;
+        std::string result = "";
+        for (const auto& param : params) {
+            result += param + "_";
+        }
+
+        return result;
     }
 };
 
 class Context {
 public:
-    void addStrategy(std::shared_ptr<StrategyBase> strategy) {
+    void addStrategy(std::shared_ptr<SpliceBase> strategy) {
         strategies.push_back(std::move(strategy));
     }
 
-    void executeStrategy() {
+    void executeStrategy(const std::list<std::string>& params) {
         for (const auto& strategy : strategies) {
-            strategy->execute();
+            auto result = strategy->execute(params);
+            std::cout << result << std::endl;
         }
     }
 
 private:
-    std::vector<std::shared_ptr<StrategyBase>> strategies;
+    std::vector<std::shared_ptr<SpliceBase>> strategies;
 };
 
 void testStrategy() {
-    auto strategyA = std::make_shared<StrategyA>();
-    auto strategyB = std::make_shared<StrategyB>();
     auto context = Context();
-    context.addStrategy(strategyA);
-    context.addStrategy(strategyB);
-    
-    context.executeStrategy();
+    context.addStrategy(std::make_shared<SpliceSpace>());
+    context.addStrategy(std::make_shared<SpliceUnderline>());
+    context.executeStrategy({"Hello", "World"});
 }
