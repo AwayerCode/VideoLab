@@ -13,9 +13,10 @@
 #include "modern/testnewfeature.hpp"
 #include "threads/thread.hpp"
 #include "io/asio.hpp"
+#include "threads/fiber.hpp"
 
 int main() 
 {
-    testAsio();
+    testFiber();
     return 0;
 }   
