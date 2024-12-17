@@ -12,8 +12,10 @@
 #include "patterns/observer.hpp"
 #include "modern/testnewfeature.hpp"
 #include "threads/thread.hpp"
+#include "io/asio.hpp"
+
 int main() 
 {
-    testThread();
+    testAsio();
     return 0;
 }   

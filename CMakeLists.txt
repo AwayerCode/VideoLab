@@ -22,6 +22,7 @@ set(INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src/patterns
     ${PROJECT_SOURCE_DIR}/src/modern
     ${PROJECT_SOURCE_DIR}/src/threads
+    ${PROJECT_SOURCE_DIR}/src/io
 )
 
 # Add executable file, including source files and header files
