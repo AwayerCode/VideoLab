@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Console VERSION 1.0)
+project(CrossPlatform VERSION 1.0)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)
@@ -18,10 +18,10 @@ set(INCLUDE_DIRS
 )
 
 # 添加可执行文件，同时包含源文件和头文件
-add_executable(Console ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES})
 
 # 添加头文件目录
-target_include_directories(Console
+target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${INCLUDE_DIRS}
 ) 
