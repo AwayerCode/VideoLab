@@ -1,27 +1,42 @@
 cmake_minimum_required(VERSION 3.10)
 project(CrossPlatform VERSION 1.0)
 
-# 设置 C++ 标准
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 收集源文件
+# Add Boost Library
+find_package(Boost REQUIRED COMPONENTS 
+    system 
+    filesystem
+)
+
+# Collect source files
 set(SOURCES
     src/main.cpp
 )
 
-# 收集头文件目录
+# Collect header file directories
 set(INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/patterns
     ${PROJECT_SOURCE_DIR}/src/modern
+    ${PROJECT_SOURCE_DIR}/src/threads
 )
 
-# 添加可执行文件，同时包含源文件和头文件
+# Add executable file, including source files and header files
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# 添加头文件目录
+# Add Link Library
+target_link_libraries(${PROJECT_NAME} 
+    ${Boost_LIBRARIES}
+    ${Boost_SYSTEM_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+)
+
+# Add header file directories
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
 ) 

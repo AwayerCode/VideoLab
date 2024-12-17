@@ -11,9 +11,9 @@
 #include "patterns/composite.hpp"
 #include "patterns/observer.hpp"
 #include "modern/testnewfeature.hpp"
-
+#include "threads/thread.hpp"
 int main() 
 {
-    testNewFeature();
+    testThread();
     return 0;
 }   
