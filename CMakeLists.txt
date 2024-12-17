@@ -37,6 +37,7 @@ target_link_libraries(${PROJECT_NAME}
     glog
     event
     fmt 
+    boost_context
 )
 
 # Add header file directories
