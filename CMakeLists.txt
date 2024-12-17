@@ -5,6 +5,14 @@ project(CrossPlatform VERSION 1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 启用 Qt 特性
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+# 添加 Qt6 支持
+find_package(Qt6 REQUIRED COMPONENTS Core)
+
 find_package(folly REQUIRED)
 find_package(Boost REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -13,6 +21,8 @@ find_package(gflags REQUIRED)
 # Collect source files
 set(SOURCES
     src/main.cpp
+    src/threads/signalslot.cpp
+    src/threads/signalslot.hpp
 )
 
 # Collect header file directories
@@ -38,6 +48,7 @@ target_link_libraries(${PROJECT_NAME}
     event
     fmt 
     boost_context
+    Qt6::Core
 )
 
 # Add header file directories
@@ -47,5 +58,5 @@ target_include_directories(${PROJECT_NAME}
         /usr/local/include       
         ${Boost_INCLUDE_DIRS}     
         ${OPENSSL_INCLUDE_DIR}   
-    ${GFLAGS_INCLUDE_DIR}     
+        ${GFLAGS_INCLUDE_DIR}     
 ) 

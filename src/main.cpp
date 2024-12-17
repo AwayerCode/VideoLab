@@ -14,9 +14,10 @@
 #include "threads/thread.hpp"
 #include "io/asio.hpp"
 #include "threads/fiber.hpp"
+#include "threads/signalslot.hpp"
 
 int main() 
 {
-    testFiber();
+    testSignalSlot();
     return 0;
 }   
