@@ -16,9 +16,9 @@
 #include "threads/fiber.hpp"
 #include "threads/signalslot.hpp"
 #include "threads/async.hpp"
-
+#include "utils/timezone.hpp"
 int main() 
 {
-    testAsync();
+    testTimezone();
     return 0;
 }   
