@@ -8,27 +8,48 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - {
+              os: ubuntu-latest,
+              vcpkg_triplet: x64-linux
+            }
+          - {
+              os: windows-latest,
+              vcpkg_triplet: x64-windows
+            }
+    
+    runs-on: ${{ matrix.config.os }}
     
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vcpkg_triplet }}
     
     steps:
     - uses: actions/checkout@v3
     
+    # Windows 和 Linux 使用不同的 bootstrap 脚本
     - name: Setup vcpkg
+      shell: bash
       run: |
         git clone https://github.com/microsoft/vcpkg.git
-        ./vcpkg/bootstrap-vcpkg.sh
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          ./vcpkg/bootstrap-vcpkg.bat
+        else
+          ./vcpkg/bootstrap-vcpkg.sh
+        fi
     
     - name: Cache vcpkg
       uses: actions/cache@v3
       with:
         path: |
+          ${{ github.workspace }}/vcpkg/installed
+          ${{ github.workspace }}/vcpkg/packages
           ~/.cache/vcpkg
-          vcpkg_installed
-        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+        key: vcpkg-${{ matrix.config.os }}-${{ hashFiles('vcpkg.json') }}
 
+    # Linux 特定依赖
     - name: Install Linux dependencies
       if: runner.os == 'Linux'
       run: |
@@ -38,14 +59,21 @@ jobs:
           libssl-dev \
           libssl3
 
+    # Windows 特定依赖
+    - name: Install Windows dependencies
+      if: runner.os == 'Windows'
+      run: |
+        choco install openssl
+
     - name: Configure CMake
+      shell: bash
       run: |
         cmake -B build \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_MANIFEST_FEATURES="" \
           -DVCPKG_BUILD_TYPE=release \
           -DVCPKG_USE_SYSTEM_OPENSSL=ON
       
     - name: Build
-      run: cmake --build build
+      run: cmake --build build --config Release
