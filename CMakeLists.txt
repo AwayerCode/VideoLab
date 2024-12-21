@@ -24,7 +24,11 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Find packages
-find_package(Boost COMPONENTS context REQUIRED)
+find_package(Boost REQUIRED COMPONENTS 
+    context 
+    system      # ASIO 需要
+    thread      # ASIO 需要
+)
 
 # Collect source files
 set(SOURCES
@@ -41,10 +45,14 @@ set(INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src/template
 )
 
+# 添加可执行文件
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+# 链接依赖库
+target_link_libraries(${PROJECT_NAME} PRIVATE 
     Boost::context
+    Boost::system
+    Boost::thread
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS}) 
