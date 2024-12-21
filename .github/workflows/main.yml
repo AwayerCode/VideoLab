@@ -26,7 +26,9 @@ jobs:
     - name: Install vcpkg
       run: |
         git clone https://github.com/Microsoft/vcpkg.git
-        ./vcpkg/bootstrap-vcpkg.sh
+        cd vcpkg
+        git checkout 4fcf123fe53c63db265b5841a5aeff06cec375a1
+        ./bootstrap-vcpkg.sh
         
     # 3. 安装依赖
     - name: Install dependencies
