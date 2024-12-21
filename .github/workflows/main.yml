@@ -10,8 +10,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    
     steps:
     - uses: actions/checkout@v3
+    
+    - name: Setup vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.sh
     
     - name: Cache vcpkg
       uses: actions/cache@v3
@@ -30,7 +38,8 @@ jobs:
     - name: Configure CMake
       run: |
         cmake -B build \
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       
     - name: Build
       run: cmake --build build
