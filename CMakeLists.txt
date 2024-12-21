@@ -14,7 +14,9 @@ set(CMAKE_AUTOUIC ON)
 find_package(fmt CONFIG REQUIRED)
 find_package(folly CONFIG REQUIRED)
 find_package(gflags CONFIG REQUIRED)
+find_package(glog CONFIG REQUIRED)
 find_package(Qt6 COMPONENTS Core Widgets REQUIRED)
+find_package(Boost COMPONENTS context REQUIRED)
 
 # Collect source files
 set(SOURCES
@@ -39,8 +41,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     fmt::fmt
     folly
     gflags
+    glog::glog
     Qt6::Core
     Qt6::Widgets
+    Boost::context
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS}) 
