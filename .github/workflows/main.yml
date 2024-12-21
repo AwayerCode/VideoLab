@@ -1,0 +1,129 @@
+name: Qt Build and Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  QT_VERSION: 6.5.3  # 指定Qt版本
+  CMAKE_VERSION: 3.24.0
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt-arch: gcc_64
+          - os: windows-latest
+            qt-arch: win64_msvc2019_64
+          - os: macos-latest
+            qt-arch: clang_64
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    
+    # 安装系统依赖
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libgl1-mesa-dev
+    
+    # 安装Qt
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        arch: ${{ matrix.qt-arch }}
+        cache: true
+    
+    # 安装CMake
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+      with:
+        cmakeVersion: ${{ env.CMAKE_VERSION }}
+    
+    # 配置与构建
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+    
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+    
+    # 运行测试（如果有的话）
+    - name: Test
+      working-directory: build
+      run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+    
+    # 上传构建产物
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ runner.os }}-build
+        path: build/
+
+  package:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact-name: Linux
+          - os: windows-latest
+            artifact-name: Windows
+          - os: macos-latest
+            artifact-name: macOS
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    # 下载构建产物
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ runner.os }}-build
+        path: build
+    
+    # Windows打包
+    - name: Package Windows
+      if: runner.os == 'Windows'
+      run: |
+        # 使用windeployqt打包依赖
+        windeployqt.exe build/Release/YourApp.exe
+        # 可以添加打包成安装程序的步骤，如使用NSIS
+    
+    # Linux打包
+    - name: Package Linux
+      if: runner.os == 'Linux'
+      run: |
+        # 使用linuxdeployqt打包依赖
+        # 创建AppImage或deb包
+        
+    # macOS打包
+    - name: Package macOS
+      if: runner.os == 'macOS'
+      run: |
+        # 使用macdeployqt打包依赖
+        macdeployqt build/YourApp.app -dmg
+    
+    # 上传最终安装包
+    - name: Upload Package
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact-name }}-package
+        path: |
+          build/*.exe
+          build/*.AppImage
+          build/*.deb
+          build/*.dmg
