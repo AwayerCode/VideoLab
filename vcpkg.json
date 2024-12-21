@@ -2,26 +2,11 @@
   "name": "cross-platform",
   "version": "1.0.0",
   "dependencies": [
-    {
-      "name": "fmt",
-      "version>=": "9.1.0"
-    },
-    {
-      "name": "folly",
-      "version>=": "2023.08.07.00"
-    },
-    {
-      "name": "gflags",
-      "version>=": "2.2.2"
-    },
-    {
-      "name": "glog",
-      "version>=": "0.6.0"
-    },
-    {
-      "name": "qtbase",
-      "default-features": true
-    }
+    "fmt",
+    "folly",
+    "gflags",
+    "glog",
+    "qtbase"
   ],
   "builtin-baseline": "4fcf123fe53c63db265b5841a5aeff06cec375a1"
 } 
