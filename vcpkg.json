@@ -5,8 +5,7 @@
     "fmt",
     "folly",
     "gflags",
-    "glog",
-    "qtbase"
+    "glog"
   ],
   "builtin-baseline": "4fcf123fe53c63db265b5841a5aeff06cec375a1"
 } 

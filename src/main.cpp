@@ -14,7 +14,6 @@
 #include "threads/thread.hpp"
 #include "io/asio.hpp"
 #include "threads/fiber.hpp"
-#include "threads/signalslot.hpp"
 #include "threads/async.hpp"
 #include "utils/timezone.hpp"
 #include "template/template.hpp"

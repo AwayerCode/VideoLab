@@ -28,14 +28,11 @@ find_package(fmt CONFIG REQUIRED)
 find_package(folly CONFIG REQUIRED)
 find_package(gflags CONFIG REQUIRED)
 find_package(glog CONFIG REQUIRED)
-find_package(Qt6 COMPONENTS Core Widgets REQUIRED)
 find_package(Boost COMPONENTS context REQUIRED)
 
 # Collect source files
 set(SOURCES
     src/main.cpp
-    src/threads/signalslot.cpp
-    src/threads/signalslot.hpp
 )
 
 set(INCLUDE_DIRS
@@ -55,8 +52,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     folly
     gflags
     glog::glog
-    Qt6::Core
-    Qt6::Widgets
     Boost::context
 )
 
