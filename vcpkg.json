@@ -1,0 +1,23 @@
+{
+  "name": "cross-platform",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "fmt",
+      "version>=": "9.1.0"
+    },
+    {
+      "name": "folly",
+      "version>=": "2023.10.09.00"
+    },
+    {
+      "name": "gflags",
+      "version>=": "2.2.2"
+    },
+    {
+      "name": "qt6",
+      "features": ["core", "widgets"]
+    }
+  ],
+  "builtin-baseline": "2023.10.19"
+} 
