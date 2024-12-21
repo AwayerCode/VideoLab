@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(CrossPlatform VERSION 1.0)
 
+# 必须在 project() 之前设置
+set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    CACHE STRING "Vcpkg toolchain file")
+
 # 自动下载并配置 vcpkg
 include(FetchContent)
 FetchContent_Declare(
@@ -9,10 +13,6 @@ FetchContent_Declare(
     GIT_TAG 4fcf123fe53c63db265b5841a5aeff06cec375a1
 )
 FetchContent_MakeAvailable(vcpkg)
-
-# 设置 vcpkg 工具链
-set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake"
-    CACHE STRING "Vcpkg toolchain file")
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
