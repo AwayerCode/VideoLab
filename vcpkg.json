@@ -2,10 +2,7 @@
   "name": "cross-platform",
   "version": "1.0.0",
   "dependencies": [
-    "fmt",
-    "folly",
-    "gflags",
-    "glog"
+    "boost-context"
   ],
   "builtin-baseline": "4fcf123fe53c63db265b5841a5aeff06cec375a1"
 } 

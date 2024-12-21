@@ -24,10 +24,6 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Find packages
-find_package(fmt CONFIG REQUIRED)
-find_package(folly CONFIG REQUIRED)
-find_package(gflags CONFIG REQUIRED)
-find_package(glog CONFIG REQUIRED)
 find_package(Boost COMPONENTS context REQUIRED)
 
 # Collect source files
@@ -48,10 +44,6 @@ set(INCLUDE_DIRS
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    fmt::fmt
-    folly
-    gflags
-    glog::glog
     Boost::context
 )
 
