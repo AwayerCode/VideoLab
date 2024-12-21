@@ -35,7 +35,15 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libgl1-mesa-dev
+        sudo apt-get install -y build-essential libgl1-mesa-dev \
+          libboost-all-dev \
+          libssl-dev \
+          libgflags-dev \
+          libdouble-conversion-dev \
+          libgoogle-glog-dev \
+          libevent-dev \
+          libfmt-dev \
+          qt6-base-dev
     
     # 安装Qt
     - name: Install Qt
