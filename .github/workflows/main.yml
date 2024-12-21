@@ -13,7 +13,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    # 1. 安装并缓存 vcpkg
     - name: Cache vcpkg
       uses: actions/cache@v3
       with:
@@ -22,26 +21,16 @@ jobs:
           vcpkg_installed
         key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
 
-    # 2. 安装 vcpkg
-    - name: Install vcpkg
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
       run: |
-        git clone https://github.com/Microsoft/vcpkg.git
-        cd vcpkg
-        git checkout 4fcf123fe53c63db265b5841a5aeff06cec375a1
-        ./bootstrap-vcpkg.sh
-        
-    # 3. 安装依赖
-    - name: Install dependencies
-      run: |
-        ./vcpkg/vcpkg install --triplet x64-linux
+        sudo apt-get update
+        sudo apt-get install -y linux-libc-dev
 
-    # 4. 配置 CMake（使用 vcpkg 工具链）
     - name: Configure CMake
       run: |
         cmake -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_BUILD_TYPE=Release
       
-    # 5. 构建
     - name: Build
       run: cmake --build build
