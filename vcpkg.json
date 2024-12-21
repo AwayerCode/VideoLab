@@ -15,8 +15,8 @@
       "version>=": "2.2.2"
     },
     {
-      "name": "qt6",
-      "features": ["core", "widgets"]
+      "name": "qtbase",
+      "default-features": true
     }
   ],
   "builtin-baseline": "4fcf123fe53c63db265b5841a5aeff06cec375a1"
