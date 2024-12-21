@@ -17,8 +17,10 @@
 #include "threads/signalslot.hpp"
 #include "threads/async.hpp"
 #include "utils/timezone.hpp"
+#include "template/template.hpp"
+
 int main() 
 {
-    testTimezone();
+    testTemplate();
     return 0;
 }   

@@ -33,6 +33,7 @@ set(INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src/threads
     ${PROJECT_SOURCE_DIR}/src/io
     ${PROJECT_SOURCE_DIR}/src/utils
+    ${PROJECT_SOURCE_DIR}/src/template
 )
 
 # Add executable file, including source files and header files
