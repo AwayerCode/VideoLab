@@ -18,6 +18,6 @@
 
 int main() 
 {
-    testTemplate();
+    testNewFeature();
     return 0;
 }   
