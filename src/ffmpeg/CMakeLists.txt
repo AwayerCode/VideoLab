@@ -12,10 +12,12 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 # 收集源文件
 set(SOURCES
     ffmpeg.cpp
+    encoder_test.cpp
 )
 
 set(HEADERS
     ffmpeg.hpp
+    encoder_test.hpp
 )
 
 # 创建动态库
