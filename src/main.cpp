@@ -15,9 +15,22 @@
 #include "threads/async.hpp"
 #include "utils/timezone.hpp"
 #include "template/template.hpp"
+#include "ffmpeg/ffmpeg.hpp"
 
 int main() 
 {
-    testNewFeature();
+    FFmpeg ffmpeg;
+    auto ret = ffmpeg.openFile("test.mp4");
+    if (!ret) {
+        std::cerr << "open file failed" << std::endl;
+        return -1;
+    }
+    std::cout << "open file success" << std::endl;
+
+    while (ffmpeg.readFrame()) {
+        std::cout << "read frame" << std::endl;
+    }
+    ffmpeg.closeFile();
+    
     return 0;
 }   
