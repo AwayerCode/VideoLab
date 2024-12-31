@@ -13,11 +13,13 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 set(SOURCES
     ffmpeg.cpp
     encoder_test.cpp
+    x264_param_test.cpp
 )
 
 set(HEADERS
     ffmpeg.hpp
     encoder_test.hpp
+    x264_param_test.hpp
 )
 
 # 创建动态库
