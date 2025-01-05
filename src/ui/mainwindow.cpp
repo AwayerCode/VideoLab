@@ -13,12 +13,26 @@ MainWindow::MainWindow(QWidget* parent)
 {
     setCentralWidget(centralWidget_);
     setupUI();
-    setWindowTitle("编码器性能测试");
+    setWindowTitle("视频编码工具");
     resize(800, 600);
 }
 
 void MainWindow::setupUI() {
-    createFileGroup();
+    // 创建标签页
+    tabWidget_ = new QTabWidget(centralWidget_);
+    mainLayout_->addWidget(tabWidget_);
+
+    // 创建编码测试页面
+    createEncoderTestTab();
+
+    // 创建格式解析页面
+    createFormatAnalysisTab();
+}
+
+void MainWindow::createEncoderTestTab() {
+    encoderTestTab_ = new QWidget();
+    encoderTestLayout_ = new QVBoxLayout(encoderTestTab_);
+    
     createEncoderGroup();
     createParameterGroup();
     createTestGroup();
@@ -28,12 +42,36 @@ void MainWindow::setupUI() {
     connect(startButton_, &QPushButton::clicked, this, &MainWindow::onStartTest);
     connect(sceneCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onSceneChanged);
+
+    tabWidget_->addTab(encoderTestTab_, "编码测试");
+}
+
+void MainWindow::createFormatAnalysisTab() {
+    formatAnalysisTab_ = new QWidget();
+    formatAnalysisLayout_ = new QVBoxLayout(formatAnalysisTab_);
+
+    createFileGroup();
+    
+    // 连接信号和槽
     connect(selectFileButton_, &QPushButton::clicked, this, &MainWindow::onSelectFile);
     connect(analyzeButton_, &QPushButton::clicked, this, &MainWindow::onAnalyzeFile);
+
+    // 添加结果显示组到格式解析页面
+    auto* formatResultGroup = new QGroupBox("分析结果", formatAnalysisTab_);
+    auto* formatResultLayout = new QVBoxLayout(formatResultGroup);
+    
+    resultText_ = new QTextEdit(formatResultGroup);
+    resultText_->setObjectName("resultText_");
+    resultText_->setReadOnly(true);
+    
+    formatResultLayout->addWidget(resultText_);
+    formatAnalysisLayout_->addWidget(formatResultGroup);
+
+    tabWidget_->addTab(formatAnalysisTab_, "格式解析");
 }
 
 void MainWindow::createFileGroup() {
-    fileGroup_ = new QGroupBox("视频文件", centralWidget_);
+    fileGroup_ = new QGroupBox("视频文件", formatAnalysisTab_);
     auto* layout = new QHBoxLayout(fileGroup_);
 
     filePathEdit_ = new QLineEdit(fileGroup_);
@@ -52,7 +90,123 @@ void MainWindow::createFileGroup() {
     layout->addWidget(selectFileButton_);
     layout->addWidget(analyzeButton_);
 
-    mainLayout_->addWidget(fileGroup_);
+    formatAnalysisLayout_->addWidget(fileGroup_);
+}
+
+void MainWindow::createEncoderGroup() {
+    encoderGroup_ = new QGroupBox("编码器选择", encoderTestTab_);
+    auto* layout = new QHBoxLayout(encoderGroup_);
+
+    // 编码器选择
+    auto* encoderLabel = new QLabel("编码器:", encoderGroup_);
+    encoderCombo_ = new QComboBox(encoderGroup_);
+    encoderCombo_->setObjectName("encoderCombo_");
+    encoderCombo_->addItem("x264 (CPU)");
+    encoderCombo_->addItem("NVENC (GPU)");
+
+    // 场景选择
+    auto* sceneLabel = new QLabel("预设场景:", encoderGroup_);
+    sceneCombo_ = new QComboBox(encoderGroup_);
+    sceneCombo_->setObjectName("sceneCombo_");
+    sceneCombo_->addItem("自定义");
+    sceneCombo_->addItem("直播场景");
+    sceneCombo_->addItem("点播场景");
+    sceneCombo_->addItem("存档场景");
+
+    layout->addWidget(encoderLabel);
+    layout->addWidget(encoderCombo_);
+    layout->addSpacing(20);
+    layout->addWidget(sceneLabel);
+    layout->addWidget(sceneCombo_);
+    layout->addStretch();
+
+    encoderTestLayout_->addWidget(encoderGroup_);
+}
+
+void MainWindow::createParameterGroup() {
+    paramGroup_ = new QGroupBox("参数设置", encoderTestTab_);
+    auto* layout = new QGridLayout(paramGroup_);
+
+    // 分辨率设置
+    auto* resLabel = new QLabel("分辨率:", paramGroup_);
+    widthSpin_ = new QSpinBox(paramGroup_);
+    widthSpin_->setObjectName("widthSpin_");
+    widthSpin_->setRange(320, 3840);
+    widthSpin_->setValue(1920);
+    auto* xLabel = new QLabel("x", paramGroup_);
+    heightSpin_ = new QSpinBox(paramGroup_);
+    heightSpin_->setObjectName("heightSpin_");
+    heightSpin_->setRange(240, 2160);
+    heightSpin_->setValue(1080);
+
+    // 帧数设置
+    auto* frameLabel = new QLabel("测试帧数:", paramGroup_);
+    frameCountSpin_ = new QSpinBox(paramGroup_);
+    frameCountSpin_->setObjectName("frameCountSpin_");
+    frameCountSpin_->setRange(30, 3000);
+    frameCountSpin_->setValue(300);
+    frameCountSpin_->setSingleStep(30);
+
+    // 线程数设置
+    auto* threadLabel = new QLabel("线程数:", paramGroup_);
+    threadsSpin_ = new QSpinBox(paramGroup_);
+    threadsSpin_->setObjectName("threadsSpin_");
+    threadsSpin_->setRange(1, 32);
+    threadsSpin_->setValue(20);
+
+    // 硬件加速选项
+    hwAccelCheck_ = new QCheckBox("启用硬件加速", paramGroup_);
+    hwAccelCheck_->setObjectName("hwAccelCheck_");
+
+    // 布局
+    int row = 0;
+    layout->addWidget(resLabel, row, 0);
+    layout->addWidget(widthSpin_, row, 1);
+    layout->addWidget(xLabel, row, 2);
+    layout->addWidget(heightSpin_, row, 3);
+
+    row++;
+    layout->addWidget(frameLabel, row, 0);
+    layout->addWidget(frameCountSpin_, row, 1);
+
+    row++;
+    layout->addWidget(threadLabel, row, 0);
+    layout->addWidget(threadsSpin_, row, 1);
+
+    row++;
+    layout->addWidget(hwAccelCheck_, row, 0, 1, 2);
+
+    encoderTestLayout_->addWidget(paramGroup_);
+}
+
+void MainWindow::createTestGroup() {
+    testGroup_ = new QGroupBox("测试控制", encoderTestTab_);
+    auto* layout = new QVBoxLayout(testGroup_);
+
+    startButton_ = new QPushButton("开始测试", testGroup_);
+    startButton_->setObjectName("startButton_");
+    progressBar_ = new QProgressBar(testGroup_);
+    progressBar_->setObjectName("progressBar_");
+    progressBar_->setRange(0, 100);
+    progressBar_->setValue(0);
+
+    layout->addWidget(startButton_);
+    layout->addWidget(progressBar_);
+
+    encoderTestLayout_->addWidget(testGroup_);
+}
+
+void MainWindow::createResultGroup() {
+    resultGroup_ = new QGroupBox("测试结果", encoderTestTab_);
+    auto* layout = new QVBoxLayout(resultGroup_);
+
+    resultText_ = new QTextEdit(resultGroup_);
+    resultText_->setObjectName("resultText_");
+    resultText_->setReadOnly(true);
+
+    layout->addWidget(resultText_);
+
+    encoderTestLayout_->addWidget(resultGroup_);
 }
 
 void MainWindow::onSelectFile() {
@@ -148,122 +302,6 @@ void MainWindow::onAnalyzeFile() {
     }
 
     resultText_->setText(resultStr);
-}
-
-void MainWindow::createEncoderGroup() {
-    encoderGroup_ = new QGroupBox("编码器选择", centralWidget_);
-    auto* layout = new QHBoxLayout(encoderGroup_);
-
-    // 编码器选择
-    auto* encoderLabel = new QLabel("编码器:", encoderGroup_);
-    encoderCombo_ = new QComboBox(encoderGroup_);
-    encoderCombo_->setObjectName("encoderCombo_");
-    encoderCombo_->addItem("x264 (CPU)");
-    encoderCombo_->addItem("NVENC (GPU)");
-
-    // 场景选择
-    auto* sceneLabel = new QLabel("预设场景:", encoderGroup_);
-    sceneCombo_ = new QComboBox(encoderGroup_);
-    sceneCombo_->setObjectName("sceneCombo_");
-    sceneCombo_->addItem("自定义");
-    sceneCombo_->addItem("直播场景");
-    sceneCombo_->addItem("点播场景");
-    sceneCombo_->addItem("存档场景");
-
-    layout->addWidget(encoderLabel);
-    layout->addWidget(encoderCombo_);
-    layout->addSpacing(20);
-    layout->addWidget(sceneLabel);
-    layout->addWidget(sceneCombo_);
-    layout->addStretch();
-
-    mainLayout_->addWidget(encoderGroup_);
-}
-
-void MainWindow::createParameterGroup() {
-    paramGroup_ = new QGroupBox("参数设置", centralWidget_);
-    auto* layout = new QGridLayout(paramGroup_);
-
-    // 分辨率设置
-    auto* resLabel = new QLabel("分辨率:", paramGroup_);
-    widthSpin_ = new QSpinBox(paramGroup_);
-    widthSpin_->setObjectName("widthSpin_");
-    widthSpin_->setRange(320, 3840);
-    widthSpin_->setValue(1920);
-    auto* xLabel = new QLabel("x", paramGroup_);
-    heightSpin_ = new QSpinBox(paramGroup_);
-    heightSpin_->setObjectName("heightSpin_");
-    heightSpin_->setRange(240, 2160);
-    heightSpin_->setValue(1080);
-
-    // 帧数设置
-    auto* frameLabel = new QLabel("测试帧数:", paramGroup_);
-    frameCountSpin_ = new QSpinBox(paramGroup_);
-    frameCountSpin_->setObjectName("frameCountSpin_");
-    frameCountSpin_->setRange(30, 3000);
-    frameCountSpin_->setValue(300);
-    frameCountSpin_->setSingleStep(30);
-
-    // 线程数设置
-    auto* threadLabel = new QLabel("线程数:", paramGroup_);
-    threadsSpin_ = new QSpinBox(paramGroup_);
-    threadsSpin_->setObjectName("threadsSpin_");
-    threadsSpin_->setRange(1, 32);
-    threadsSpin_->setValue(20);
-
-    // 硬件加速选项
-    hwAccelCheck_ = new QCheckBox("启用硬件加速", paramGroup_);
-    hwAccelCheck_->setObjectName("hwAccelCheck_");
-
-    // 布局
-    int row = 0;
-    layout->addWidget(resLabel, row, 0);
-    layout->addWidget(widthSpin_, row, 1);
-    layout->addWidget(xLabel, row, 2);
-    layout->addWidget(heightSpin_, row, 3);
-
-    row++;
-    layout->addWidget(frameLabel, row, 0);
-    layout->addWidget(frameCountSpin_, row, 1);
-
-    row++;
-    layout->addWidget(threadLabel, row, 0);
-    layout->addWidget(threadsSpin_, row, 1);
-
-    row++;
-    layout->addWidget(hwAccelCheck_, row, 0, 1, 2);
-
-    mainLayout_->addWidget(paramGroup_);
-}
-
-void MainWindow::createTestGroup() {
-    testGroup_ = new QGroupBox("测试控制", centralWidget_);
-    auto* layout = new QVBoxLayout(testGroup_);
-
-    startButton_ = new QPushButton("开始测试", testGroup_);
-    startButton_->setObjectName("startButton_");
-    progressBar_ = new QProgressBar(testGroup_);
-    progressBar_->setObjectName("progressBar_");
-    progressBar_->setRange(0, 100);
-    progressBar_->setValue(0);
-
-    layout->addWidget(startButton_);
-    layout->addWidget(progressBar_);
-
-    mainLayout_->addWidget(testGroup_);
-}
-
-void MainWindow::createResultGroup() {
-    resultGroup_ = new QGroupBox("测试结果", centralWidget_);
-    auto* layout = new QVBoxLayout(resultGroup_);
-
-    resultText_ = new QTextEdit(resultGroup_);
-    resultText_->setObjectName("resultText_");
-    resultText_->setReadOnly(true);
-
-    layout->addWidget(resultText_);
-
-    mainLayout_->addWidget(resultGroup_);
 }
 
 void MainWindow::onStartTest() {

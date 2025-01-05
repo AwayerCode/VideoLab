@@ -15,6 +15,7 @@
 #include <QStatusBar>
 #include <QGridLayout>
 #include <QLineEdit>
+#include <QTabWidget>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -35,6 +36,8 @@ private slots:
 
 private:
     void setupUI();
+    void createEncoderTestTab();
+    void createFormatAnalysisTab();
     void createFileGroup();
     void createEncoderGroup();
     void createParameterGroup();
@@ -44,6 +47,15 @@ private:
     // UI 组件
     QWidget* centralWidget_;
     QVBoxLayout* mainLayout_;
+    QTabWidget* tabWidget_;
+
+    // 编码测试页面
+    QWidget* encoderTestTab_;
+    QVBoxLayout* encoderTestLayout_;
+
+    // 格式解析页面
+    QWidget* formatAnalysisTab_;
+    QVBoxLayout* formatAnalysisLayout_;
 
     // 文件选择组
     QGroupBox* fileGroup_;
