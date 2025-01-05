@@ -1,10 +1,7 @@
-#include <QApplication>
-#include "ui/mainwindow.hpp"
+#include <iostream>
 
 int main(int argc, char *argv[]) 
 {
-    QApplication app(argc, argv);
-    MainWindow window;
-    window.show();
-    return app.exec();
+    std::cout << "Cross Platform Video Tool" << std::endl;
+    return 0;
 }   
