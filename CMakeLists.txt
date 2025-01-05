@@ -18,7 +18,15 @@ FetchContent_Declare(
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+
+# 添加 CLI11
+FetchContent_Declare(
+    cli11
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.4.1
+)
+
+FetchContent_MakeAvailable(googletest cli11)
 
 # 添加子目录
 add_subdirectory(src/ffmpeg)
@@ -41,4 +49,5 @@ target_link_libraries(${PROJECT_NAME}
         Boost::system
         Boost::thread
         Boost::context
+        CLI11::CLI11
 ) 

@@ -6,38 +6,27 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavcodec
     libavformat
     libavutil
-    libswscale
     libavfilter
+    libswscale
 )
 
 # 收集源文件
 set(SOURCES
     ffmpeg.cpp
-    encoder_test.cpp
-    x264_param_test.cpp
-    videofilter.cpp
+    analyzer.cpp
 )
 
-set(HEADERS
-    ffmpeg.hpp
-    encoder_test.hpp
-    x264_param_test.hpp
-    videofilter.hpp
-)
-
-# 创建动态库
-add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
-
-# 设置包含目录
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    PRIVATE
-        ${FFMPEG_INCLUDE_DIRS}
-)
+# 创建库
+add_library(cp_ffmpeg ${SOURCES})
 
 # 链接 FFmpeg 库
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(cp_ffmpeg
     PRIVATE
         PkgConfig::FFMPEG
+)
+
+# 设置包含目录
+target_include_directories(cp_ffmpeg
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
 ) 
