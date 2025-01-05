@@ -21,6 +21,8 @@
 #include <QtMultimediaWidgets/QVideoWidget>
 #include <QtMultimedia/QMediaPlayer>
 #include <QSlider>
+#include <QStackedWidget>
+#include "../ffmpeg/videofilter.hpp"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -48,12 +50,17 @@ private slots:
     void onDurationChanged(qint64 duration);
     void onSliderMoved(int position);
     void onPlayerStateChanged(QMediaPlayer::PlaybackState state);
+    void onSelectFilterFile();
+    void onFilterChanged(int index);
+    void onFilterParamChanged();
+    void onFilterPlayPause();
 
 private:
     void setupUI();
     void createEncoderTestTab();
     void createFormatAnalysisTab();
     void createPlayerTab();
+    void createFilterTab();
     void createFileGroup();
     void createEncoderGroup();
     void createParameterGroup();
@@ -117,4 +124,33 @@ private:
 
     // 结果显示组
     QGroupBox* resultGroup_;
+
+    // 滤镜测试页面
+    QWidget* filterTab_;
+    QHBoxLayout* filterLayout_;
+    QVideoWidget* sourceVideoWidget_;
+    QVideoWidget* filteredVideoWidget_;
+    QMediaPlayer* sourcePlayer_;
+    QMediaPlayer* filteredPlayer_;
+    QWidget* filterControlWidget_;
+    QVBoxLayout* filterControlLayout_;
+    QPushButton* selectFilterFileButton_;
+    QPushButton* filterPlayPauseButton_;
+    QComboBox* filterCombo_;
+    QStackedWidget* filterParamsWidget_;
+    QSlider* filterPositionSlider_;
+    QLabel* filterTimeLabel_;
+    QLabel* filterDurationLabel_;
+
+    // 滤镜参数组件
+    QWidget* brightnessContrastWidget_;
+    QSpinBox* brightnessSpin_;
+    QSpinBox* contrastSpin_;
+    QWidget* hsvAdjustWidget_;
+    QSpinBox* hueSpin_;
+    QSpinBox* saturationSpin_;
+    QSpinBox* valueSpin_;
+    QWidget* sharpenBlurWidget_;
+    QDoubleSpinBox* sharpenSpin_;
+    QDoubleSpinBox* blurSpin_;
 }; 

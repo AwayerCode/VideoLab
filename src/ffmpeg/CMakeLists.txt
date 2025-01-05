@@ -7,6 +7,7 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavformat
     libavutil
     libswscale
+    libavfilter
 )
 
 # 收集源文件
@@ -14,12 +15,14 @@ set(SOURCES
     ffmpeg.cpp
     encoder_test.cpp
     x264_param_test.cpp
+    videofilter.cpp
 )
 
 set(HEADERS
     ffmpeg.hpp
     encoder_test.hpp
     x264_param_test.hpp
+    videofilter.hpp
 )
 
 # 创建动态库

@@ -30,6 +30,9 @@ void MainWindow::setupUI() {
 
     // 创建播放器页面
     createPlayerTab();
+
+    // 创建滤镜测试页面
+    createFilterTab();
 }
 
 void MainWindow::createEncoderTestTab() {
@@ -690,4 +693,264 @@ QString MainWindow::formatTime(qint64 ms) {
         .arg(hours, 2, 10, QChar('0'))
         .arg(minutes % 60, 2, 10, QChar('0'))
         .arg(seconds % 60, 2, 10, QChar('0'));
+}
+
+void MainWindow::createFilterTab() {
+    filterTab_ = new QWidget();
+    filterLayout_ = new QHBoxLayout(filterTab_);
+    filterLayout_->setSpacing(6);
+    filterLayout_->setContentsMargins(6, 6, 6, 6);
+
+    // 创建源视频播放器
+    sourceVideoWidget_ = new QVideoWidget(filterTab_);
+    sourceVideoWidget_->setMinimumWidth(400);
+    sourceVideoWidget_->setMinimumHeight(400);
+    filterLayout_->addWidget(sourceVideoWidget_);
+
+    sourcePlayer_ = new QMediaPlayer(this);
+    sourcePlayer_->setVideoOutput(sourceVideoWidget_);
+
+    // 创建滤镜控制区域
+    filterControlWidget_ = new QWidget(filterTab_);
+    filterControlWidget_->setMaximumWidth(200);
+    filterControlLayout_ = new QVBoxLayout(filterControlWidget_);
+    filterControlLayout_->setSpacing(6);
+    filterControlLayout_->setContentsMargins(6, 6, 6, 6);
+
+    // 文件选择按钮
+    selectFilterFileButton_ = new QPushButton("选择视频", filterControlWidget_);
+    filterControlLayout_->addWidget(selectFilterFileButton_);
+
+    // 播放控制
+    filterPlayPauseButton_ = new QPushButton("播放", filterControlWidget_);
+    filterPlayPauseButton_->setEnabled(false);
+    filterControlLayout_->addWidget(filterPlayPauseButton_);
+
+    // 滤镜选择
+    filterCombo_ = new QComboBox(filterControlWidget_);
+    filterCombo_->addItem("亮度/对比度");
+    filterCombo_->addItem("HSV调整");
+    filterCombo_->addItem("锐化/模糊");
+    filterControlLayout_->addWidget(filterCombo_);
+
+    // 滤镜参数区域
+    filterParamsWidget_ = new QStackedWidget(filterControlWidget_);
+    
+    // 亮度/对比度参数
+    brightnessContrastWidget_ = new QWidget();
+    auto* brightnessLayout = new QVBoxLayout(brightnessContrastWidget_);
+    brightnessSpin_ = new QSpinBox(brightnessContrastWidget_);
+    brightnessSpin_->setRange(-100, 100);
+    brightnessSpin_->setValue(0);
+    brightnessSpin_->setSuffix(" %");
+    brightnessLayout->addWidget(new QLabel("亮度:"));
+    brightnessLayout->addWidget(brightnessSpin_);
+
+    contrastSpin_ = new QSpinBox(brightnessContrastWidget_);
+    contrastSpin_->setRange(-100, 100);
+    contrastSpin_->setValue(0);
+    contrastSpin_->setSuffix(" %");
+    brightnessLayout->addWidget(new QLabel("对比度:"));
+    brightnessLayout->addWidget(contrastSpin_);
+    brightnessLayout->addStretch();
+    filterParamsWidget_->addWidget(brightnessContrastWidget_);
+
+    // HSV调整参数
+    hsvAdjustWidget_ = new QWidget();
+    auto* hsvLayout = new QVBoxLayout(hsvAdjustWidget_);
+    hueSpin_ = new QSpinBox(hsvAdjustWidget_);
+    hueSpin_->setRange(-180, 180);
+    hueSpin_->setValue(0);
+    hueSpin_->setSuffix("°");
+    hsvLayout->addWidget(new QLabel("色相:"));
+    hsvLayout->addWidget(hueSpin_);
+
+    saturationSpin_ = new QSpinBox(hsvAdjustWidget_);
+    saturationSpin_->setRange(-100, 100);
+    saturationSpin_->setValue(0);
+    saturationSpin_->setSuffix(" %");
+    hsvLayout->addWidget(new QLabel("饱和度:"));
+    hsvLayout->addWidget(saturationSpin_);
+
+    valueSpin_ = new QSpinBox(hsvAdjustWidget_);
+    valueSpin_->setRange(-100, 100);
+    valueSpin_->setValue(0);
+    valueSpin_->setSuffix(" %");
+    hsvLayout->addWidget(new QLabel("明度:"));
+    hsvLayout->addWidget(valueSpin_);
+    hsvLayout->addStretch();
+    filterParamsWidget_->addWidget(hsvAdjustWidget_);
+
+    // 锐化/模糊参数
+    sharpenBlurWidget_ = new QWidget();
+    auto* sharpenLayout = new QVBoxLayout(sharpenBlurWidget_);
+    sharpenSpin_ = new QDoubleSpinBox(sharpenBlurWidget_);
+    sharpenSpin_->setRange(0, 10);
+    sharpenSpin_->setValue(0);
+    sharpenSpin_->setSingleStep(0.1);
+    sharpenLayout->addWidget(new QLabel("锐化:"));
+    sharpenLayout->addWidget(sharpenSpin_);
+
+    blurSpin_ = new QDoubleSpinBox(sharpenBlurWidget_);
+    blurSpin_->setRange(0, 10);
+    blurSpin_->setValue(0);
+    blurSpin_->setSingleStep(0.1);
+    sharpenLayout->addWidget(new QLabel("模糊:"));
+    sharpenLayout->addWidget(blurSpin_);
+    sharpenLayout->addStretch();
+    filterParamsWidget_->addWidget(sharpenBlurWidget_);
+
+    filterControlLayout_->addWidget(filterParamsWidget_);
+
+    // 进度控制
+    filterPositionSlider_ = new QSlider(Qt::Horizontal, filterControlWidget_);
+    filterPositionSlider_->setEnabled(false);
+    filterControlLayout_->addWidget(filterPositionSlider_);
+
+    auto* timeLayout = new QHBoxLayout();
+    filterTimeLabel_ = new QLabel("00:00:00", filterControlWidget_);
+    filterDurationLabel_ = new QLabel("00:00:00", filterControlWidget_);
+    timeLayout->addWidget(filterTimeLabel_);
+    timeLayout->addStretch();
+    timeLayout->addWidget(filterDurationLabel_);
+    filterControlLayout_->addLayout(timeLayout);
+
+    filterLayout_->addWidget(filterControlWidget_);
+
+    // 创建处理后的视频播放器
+    filteredVideoWidget_ = new QVideoWidget(filterTab_);
+    filteredVideoWidget_->setMinimumWidth(400);
+    filteredVideoWidget_->setMinimumHeight(400);
+    filterLayout_->addWidget(filteredVideoWidget_);
+
+    filteredPlayer_ = new QMediaPlayer(this);
+    filteredPlayer_->setVideoOutput(filteredVideoWidget_);
+
+    // 连接信号和槽
+    connect(selectFilterFileButton_, &QPushButton::clicked, this, &MainWindow::onSelectFilterFile);
+    connect(filterPlayPauseButton_, &QPushButton::clicked, this, &MainWindow::onFilterPlayPause);
+    connect(filterCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onFilterChanged);
+    connect(brightnessSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(contrastSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(hueSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(saturationSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(valueSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(sharpenSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(blurSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::onFilterParamChanged);
+    connect(sourcePlayer_, &QMediaPlayer::positionChanged,
+            filterPositionSlider_, &QSlider::setValue);
+    connect(sourcePlayer_, &QMediaPlayer::durationChanged, this,
+            [this](qint64 duration) {
+                filterPositionSlider_->setRange(0, duration);
+                filterPositionSlider_->setEnabled(true);
+                filterDurationLabel_->setText(formatTime(duration));
+            });
+    connect(filterPositionSlider_, &QSlider::sliderMoved,
+            [this](int position) {
+                sourcePlayer_->setPosition(position);
+                filteredPlayer_->setPosition(position);
+            });
+    connect(sourcePlayer_, &QMediaPlayer::positionChanged,
+            [this](qint64 position) {
+                if (!filterPositionSlider_->isSliderDown()) {
+                    filterPositionSlider_->setValue(position);
+                }
+                filterTimeLabel_->setText(formatTime(position));
+            });
+
+    tabWidget_->addTab(filterTab_, "滤镜测试");
+}
+
+void MainWindow::onSelectFilterFile() {
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        "选择视频文件",
+        QString(),
+        "视频文件 (*.mp4 *.avi *.mkv *.mov *.wmv);;所有文件 (*.*)"
+    );
+
+    if (!filePath.isEmpty()) {
+        sourcePlayer_->setSource(QUrl::fromLocalFile(filePath));
+        filteredPlayer_->setSource(QUrl::fromLocalFile(filePath));  // 暂时使用相同文件
+        filterPlayPauseButton_->setEnabled(true);
+        filterPlayPauseButton_->setText("播放");
+    }
+}
+
+void MainWindow::onFilterPlayPause() {
+    if (sourcePlayer_->playbackState() == QMediaPlayer::PlayingState) {
+        sourcePlayer_->pause();
+        filteredPlayer_->pause();
+        filterPlayPauseButton_->setText("播放");
+    } else {
+        sourcePlayer_->play();
+        filteredPlayer_->play();
+        filterPlayPauseButton_->setText("暂停");
+    }
+}
+
+void MainWindow::onFilterChanged(int index) {
+    filterParamsWidget_->setCurrentIndex(index);
+    onFilterParamChanged();  // 更新滤镜效果
+}
+
+void MainWindow::onFilterParamChanged() {
+    if (!sourcePlayer_->source().isValid()) {
+        return;
+    }
+
+    QString inputPath = sourcePlayer_->source().toLocalFile();
+    QString outputPath = inputPath + ".filtered.mp4";
+
+    VideoFilter::FilterParams params;
+    switch (filterCombo_->currentIndex()) {
+        case 0:  // 亮度/对比度
+            params.type = VideoFilter::FilterType::BRIGHTNESS_CONTRAST;
+            params.bc.brightness = brightnessSpin_->value();
+            params.bc.contrast = contrastSpin_->value();
+            break;
+        case 1:  // HSV调整
+            params.type = VideoFilter::FilterType::HSV_ADJUST;
+            params.hsv.hue = hueSpin_->value();
+            params.hsv.saturation = saturationSpin_->value();
+            params.hsv.value = valueSpin_->value();
+            break;
+        case 2:  // 锐化/模糊
+            params.type = VideoFilter::FilterType::SHARPEN_BLUR;
+            params.sb.sharpen = sharpenSpin_->value();
+            params.sb.blur = blurSpin_->value();
+            break;
+    }
+
+    VideoFilter filter;
+    if (!filter.init(inputPath.toStdString(), outputPath.toStdString())) {
+        QMessageBox::warning(this, "错误", "初始化滤镜失败");
+        return;
+    }
+
+    if (!filter.updateFilter(params)) {
+        QMessageBox::warning(this, "错误", "更新滤镜参数失败");
+        return;
+    }
+
+    // 处理视频
+    while (filter.processFrame()) {
+        // TODO: 更新进度显示
+    }
+
+    filter.close();
+
+    // 更新右侧视频播放器
+    filteredPlayer_->setSource(QUrl::fromLocalFile(outputPath));
+    if (sourcePlayer_->playbackState() == QMediaPlayer::PlayingState) {
+        filteredPlayer_->play();
+    }
 } 
