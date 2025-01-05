@@ -16,6 +16,12 @@
 #include <QGridLayout>
 #include <QLineEdit>
 #include <QTabWidget>
+#include <QTreeWidget>
+#include <QSplitter>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -43,6 +49,9 @@ private:
     void createParameterGroup();
     void createTestGroup();
     void createResultGroup();
+    void updateH264Details(AVCodecParameters* codecParams, QTreeWidgetItem* parent);
+    QString getPixFmtName(int format);
+    QString getChromaSamplingName(int format);
 
     // UI 组件
     QWidget* centralWidget_;
@@ -56,6 +65,9 @@ private:
     // 格式解析页面
     QWidget* formatAnalysisTab_;
     QVBoxLayout* formatAnalysisLayout_;
+    QSplitter* formatAnalysisSplitter_;
+    QTreeWidget* formatTree_;
+    QTextEdit* resultText_;
 
     // 文件选择组
     QGroupBox* fileGroup_;
@@ -83,5 +95,4 @@ private:
 
     // 结果显示组
     QGroupBox* resultGroup_;
-    QTextEdit* resultText_;
 }; 

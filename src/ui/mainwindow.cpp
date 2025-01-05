@@ -49,6 +49,8 @@ void MainWindow::createEncoderTestTab() {
 void MainWindow::createFormatAnalysisTab() {
     formatAnalysisTab_ = new QWidget();
     formatAnalysisLayout_ = new QVBoxLayout(formatAnalysisTab_);
+    formatAnalysisLayout_->setSpacing(6);  // 减小间距
+    formatAnalysisLayout_->setContentsMargins(6, 6, 6, 6);  // 减小边距
 
     createFileGroup();
     
@@ -56,35 +58,48 @@ void MainWindow::createFormatAnalysisTab() {
     connect(selectFileButton_, &QPushButton::clicked, this, &MainWindow::onSelectFile);
     connect(analyzeButton_, &QPushButton::clicked, this, &MainWindow::onAnalyzeFile);
 
-    // 添加结果显示组到格式解析页面
-    auto* formatResultGroup = new QGroupBox("分析结果", formatAnalysisTab_);
-    auto* formatResultLayout = new QVBoxLayout(formatResultGroup);
+    // 创建分割器
+    formatAnalysisSplitter_ = new QSplitter(Qt::Horizontal, formatAnalysisTab_);
     
-    resultText_ = new QTextEdit(formatResultGroup);
-    resultText_->setObjectName("resultText_");
+    // 创建树形视图
+    formatTree_ = new QTreeWidget(formatAnalysisSplitter_);
+    formatTree_->setHeaderLabels({"属性", "值"});
+    formatTree_->setColumnWidth(0, 200);
+    formatTree_->setMinimumHeight(400);  // 设置最小高度
+    
+    // 创建文本编辑器
+    resultText_ = new QTextEdit(formatAnalysisSplitter_);
     resultText_->setReadOnly(true);
     
-    formatResultLayout->addWidget(resultText_);
-    formatAnalysisLayout_->addWidget(formatResultGroup);
-
+    // 设置分割器的初始大小比例
+    formatAnalysisSplitter_->setStretchFactor(0, 2);  // 树形视图占比更大
+    formatAnalysisSplitter_->setStretchFactor(1, 1);
+    
+    formatAnalysisLayout_->addWidget(formatAnalysisSplitter_);
     tabWidget_->addTab(formatAnalysisTab_, "格式解析");
 }
 
 void MainWindow::createFileGroup() {
     fileGroup_ = new QGroupBox("视频文件", formatAnalysisTab_);
     auto* layout = new QHBoxLayout(fileGroup_);
+    layout->setContentsMargins(6, 6, 6, 6);  // 减小边距
 
     filePathEdit_ = new QLineEdit(fileGroup_);
     filePathEdit_->setObjectName("filePathEdit_");
     filePathEdit_->setReadOnly(true);
     filePathEdit_->setPlaceholderText("请选择视频文件...");
+    filePathEdit_->setMaximumHeight(25);  // 限制高度
 
     selectFileButton_ = new QPushButton("选择文件", fileGroup_);
     selectFileButton_->setObjectName("selectFileButton_");
+    selectFileButton_->setMaximumWidth(80);  // 限制按钮宽度
+    selectFileButton_->setMaximumHeight(25);  // 限制按钮高度
 
     analyzeButton_ = new QPushButton("解析文件", fileGroup_);
     analyzeButton_->setObjectName("analyzeButton_");
     analyzeButton_->setEnabled(false);
+    analyzeButton_->setMaximumWidth(80);  // 限制按钮宽度
+    analyzeButton_->setMaximumHeight(25);  // 限制按钮高度
 
     layout->addWidget(filePathEdit_);
     layout->addWidget(selectFileButton_);
@@ -230,29 +245,30 @@ void MainWindow::onAnalyzeFile() {
         return;
     }
 
-    QFileInfo fileInfo(filePath);
-    QMimeDatabase db;
-    QString mimeType = db.mimeTypeForFile(filePath).name();
+    // 清空之前的结果
+    formatTree_->clear();
+    resultText_->clear();
 
-    QString resultStr;
-    resultStr += QString("文件信息:\n");
-    resultStr += QString("文件名: %1\n").arg(fileInfo.fileName());
-    resultStr += QString("文件大小: %1 MB\n").arg(fileInfo.size() / 1024.0 / 1024.0, 0, 'f', 2);
-    resultStr += QString("MIME类型: %1\n").arg(mimeType);
-    resultStr += QString("创建时间: %1\n").arg(fileInfo.birthTime().toString("yyyy-MM-dd hh:mm:ss"));
-    resultStr += QString("修改时间: %1\n").arg(fileInfo.lastModified().toString("yyyy-MM-dd hh:mm:ss"));
-    resultStr += QString("\n正在分析视频格式...\n");
+    QFileInfo fileInfo(filePath);
+    
+    // 创建基本信息节点
+    auto* basicInfoItem = new QTreeWidgetItem(formatTree_, {"基本信息"});
+    new QTreeWidgetItem(basicInfoItem, {"文件名", fileInfo.fileName()});
+    new QTreeWidgetItem(basicInfoItem, {"文件大小", QString("%1 MB").arg(fileInfo.size() / 1024.0 / 1024.0, 0, 'f', 2)});
+    new QTreeWidgetItem(basicInfoItem, {"创建时间", fileInfo.birthTime().toString("yyyy-MM-dd hh:mm:ss")});
+    new QTreeWidgetItem(basicInfoItem, {"修改时间", fileInfo.lastModified().toString("yyyy-MM-dd hh:mm:ss")});
 
     // 使用FFmpeg分析视频文件
     FFmpeg ffmpeg;
     if (ffmpeg.openFile(filePath.toStdString())) {
         AVFormatContext* formatContext = ffmpeg.getFormatContext();
         if (formatContext) {
-            resultStr += QString("\n视频格式信息:\n");
-            resultStr += QString("格式: %1\n").arg(formatContext->iformat->long_name);
-            resultStr += QString("时长: %1 秒\n").arg(formatContext->duration / 1000000.0, 0, 'f', 2);
-            resultStr += QString("比特率: %1 Kbps\n").arg(formatContext->bit_rate / 1000);
-            resultStr += QString("流数量: %1\n").arg(formatContext->nb_streams);
+            // 创建容器格式节点
+            auto* formatInfoItem = new QTreeWidgetItem(formatTree_, {"容器格式"});
+            new QTreeWidgetItem(formatInfoItem, {"格式", formatContext->iformat->long_name});
+            new QTreeWidgetItem(formatInfoItem, {"时长", QString("%1 秒").arg(formatContext->duration / 1000000.0, 0, 'f', 2)});
+            new QTreeWidgetItem(formatInfoItem, {"比特率", QString("%1 Kbps").arg(formatContext->bit_rate / 1000)});
+            new QTreeWidgetItem(formatInfoItem, {"流数量", QString::number(formatContext->nb_streams)});
 
             // 分析每个流
             for (unsigned int i = 0; i < formatContext->nb_streams; i++) {
@@ -260,48 +276,194 @@ void MainWindow::onAnalyzeFile() {
                 AVCodecParameters* codecParams = stream->codecpar;
                 const AVCodec* codec = avcodec_find_decoder(codecParams->codec_id);
 
-                resultStr += QString("\n流 #%1\n").arg(i);
+                QString streamType;
+                auto* streamItem = new QTreeWidgetItem(formatTree_);
+
                 switch (codecParams->codec_type) {
-                    case AVMEDIA_TYPE_VIDEO:
-                        resultStr += QString("类型: 视频\n");
+                    case AVMEDIA_TYPE_VIDEO: {
+                        streamType = "视频流";
+                        streamItem->setText(0, QString("视频流 #%1").arg(i));
                         if (codec) {
-                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                            new QTreeWidgetItem(streamItem, {"编码器", codec->long_name});
                         }
-                        resultStr += QString("分辨率: %1x%2\n").arg(codecParams->width).arg(codecParams->height);
+                        new QTreeWidgetItem(streamItem, {"分辨率", QString("%1x%2").arg(codecParams->width).arg(codecParams->height)});
                         if (stream->avg_frame_rate.num && stream->avg_frame_rate.den) {
-                            resultStr += QString("帧率: %1 fps\n")
-                                .arg(av_q2d(stream->avg_frame_rate), 0, 'f', 2);
+                            new QTreeWidgetItem(streamItem, {"帧率", QString("%1 fps").arg(av_q2d(stream->avg_frame_rate), 0, 'f', 2)});
+                        }
+                        
+                        // 如果是H.264编码，添加详细信息
+                        if (codecParams->codec_id == AV_CODEC_ID_H264) {
+                            updateH264Details(codecParams, streamItem);
                         }
                         break;
-
-                    case AVMEDIA_TYPE_AUDIO:
-                        resultStr += QString("类型: 音频\n");
+                    }
+                    case AVMEDIA_TYPE_AUDIO: {
+                        streamType = "音频流";
+                        streamItem->setText(0, QString("音频流 #%1").arg(i));
                         if (codec) {
-                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                            new QTreeWidgetItem(streamItem, {"编码器", codec->long_name});
                         }
-                        resultStr += QString("采样率: %1 Hz\n").arg(codecParams->sample_rate);
-                        resultStr += QString("声道数: %1\n").arg(codecParams->ch_layout.nb_channels);
+                        new QTreeWidgetItem(streamItem, {"采样率", QString("%1 Hz").arg(codecParams->sample_rate)});
+                        new QTreeWidgetItem(streamItem, {"声道数", QString::number(codecParams->ch_layout.nb_channels)});
+                        new QTreeWidgetItem(streamItem, {"采样格式", QString::number(codecParams->format)});
                         break;
-
-                    case AVMEDIA_TYPE_SUBTITLE:
-                        resultStr += QString("类型: 字幕\n");
+                    }
+                    case AVMEDIA_TYPE_SUBTITLE: {
+                        streamType = "字幕流";
+                        streamItem->setText(0, QString("字幕流 #%1").arg(i));
                         if (codec) {
-                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                            new QTreeWidgetItem(streamItem, {"编码器", codec->long_name});
                         }
                         break;
-
+                    }
                     default:
-                        resultStr += QString("类型: 其他\n");
+                        streamType = "其他流";
+                        streamItem->setText(0, QString("其他流 #%1").arg(i));
                         break;
+                }
+
+                // 添加流的通用信息
+                new QTreeWidgetItem(streamItem, {"索引", QString::number(i)});
+                new QTreeWidgetItem(streamItem, {"编码器ID", QString::number(codecParams->codec_id)});
+                if (stream->duration > 0) {
+                    new QTreeWidgetItem(streamItem, {"流时长", QString("%1 秒").arg(stream->duration * av_q2d(stream->time_base), 0, 'f', 2)});
                 }
             }
         }
         ffmpeg.closeFile();
     } else {
-        resultStr += QString("\n无法打开文件进行分析，请确保文件格式正确且未被损坏。");
+        QMessageBox::warning(this, "错误", "无法打开文件进行分析，请确保文件格式正确且未被损坏。");
     }
 
-    resultText_->setText(resultStr);
+    // 展开所有节点
+    formatTree_->expandAll();
+}
+
+void MainWindow::updateH264Details(AVCodecParameters* codecParams, QTreeWidgetItem* parent) {
+    auto* h264Item = new QTreeWidgetItem(parent, {"H.264详细信息"});
+    
+    // 基本编码信息
+    QString profileName;
+    switch (codecParams->profile) {
+        case FF_PROFILE_H264_BASELINE: profileName = "Baseline"; break;
+        case FF_PROFILE_H264_MAIN: profileName = "Main"; break;
+        case FF_PROFILE_H264_EXTENDED: profileName = "Extended"; break;
+        case FF_PROFILE_H264_HIGH: profileName = "High"; break;
+        case FF_PROFILE_H264_HIGH_10: profileName = "High 10"; break;
+        case FF_PROFILE_H264_HIGH_422: profileName = "High 422"; break;
+        case FF_PROFILE_H264_HIGH_444: profileName = "High 444"; break;
+        default: profileName = QString::number(codecParams->profile); break;
+    }
+    new QTreeWidgetItem(h264Item, {"Profile", profileName});
+    
+    // Level信息
+    double level = codecParams->level / 10.0;
+    new QTreeWidgetItem(h264Item, {"Level", QString::number(level, 'f', 1)});
+    
+    // 编码参数
+    if (codecParams->bit_rate > 0) {
+        new QTreeWidgetItem(h264Item, {"编码器比特率", QString("%1 Kbps").arg(codecParams->bit_rate / 1000)});
+    }
+
+    // NAL单元分析
+    if (codecParams->extradata && codecParams->extradata_size > 0) {
+        auto* nalItem = new QTreeWidgetItem(h264Item, {"NAL单元分析"});
+        const uint8_t* data = codecParams->extradata;
+        int size = codecParams->extradata_size;
+        
+        int spsCount = 0;
+        int ppsCount = 0;
+        QMap<int, int> naluTypes;  // 统计各类型NAL单元数量
+
+        for (int i = 0; i < size - 4; i++) {
+            // 查找NAL单元起始码
+            if ((data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x01) ||
+                (data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x00 && data[i+3] == 0x01)) {
+                
+                int startCodeLen = (data[i+2] == 0x01) ? 3 : 4;
+                int offset = i + startCodeLen;
+                uint8_t nalType = data[offset] & 0x1F;
+                naluTypes[nalType]++;
+
+                // 分析特定类型的NAL单元
+                switch (nalType) {
+                    case 7: {  // SPS
+                        spsCount++;
+                        auto* spsItem = new QTreeWidgetItem(nalItem, {QString("SPS #%1").arg(spsCount)});
+                        // SPS详细信息解析
+                        uint8_t profileIdc = data[offset + 1];
+                        uint8_t levelIdc = data[offset + 3];
+                        new QTreeWidgetItem(spsItem, {"Profile IDC", QString::number(profileIdc)});
+                        new QTreeWidgetItem(spsItem, {"Level IDC", QString::number(levelIdc)});
+                        break;
+                    }
+                    case 8: {  // PPS
+                        ppsCount++;
+                        auto* ppsItem = new QTreeWidgetItem(nalItem, {QString("PPS #%1").arg(ppsCount)});
+                        // PPS基本信息
+                        new QTreeWidgetItem(ppsItem, {"偏移位置", QString("0x%1").arg(offset, 0, 16)});
+                        break;
+                    }
+                }
+                
+                // 跳过已处理的NAL单元
+                i = offset;
+            }
+        }
+
+        // 添加NAL单元统计信息
+        auto* nalStatsItem = new QTreeWidgetItem(nalItem, {"NAL单元统计"});
+        new QTreeWidgetItem(nalStatsItem, {"SPS数量", QString::number(spsCount)});
+        new QTreeWidgetItem(nalStatsItem, {"PPS数量", QString::number(ppsCount)});
+        
+        // 添加各类型NAL单元统计
+        for (auto it = naluTypes.constBegin(); it != naluTypes.constEnd(); ++it) {
+            QString nalTypeName;
+            switch (it.key()) {
+                case 1: nalTypeName = "非IDR图像片段"; break;
+                case 5: nalTypeName = "IDR图像片段"; break;
+                case 6: nalTypeName = "SEI"; break;
+                case 7: nalTypeName = "SPS"; break;
+                case 8: nalTypeName = "PPS"; break;
+                case 9: nalTypeName = "分隔符"; break;
+                default: nalTypeName = QString("类型%1").arg(it.key()); break;
+            }
+            new QTreeWidgetItem(nalStatsItem, {
+                nalTypeName,
+                QString("%1个").arg(it.value())
+            });
+        }
+    }
+
+    // 编码参数组
+    auto* paramItem = new QTreeWidgetItem(h264Item, {"编码参数"});
+    new QTreeWidgetItem(paramItem, {"色彩空间", getPixFmtName(codecParams->format)});
+    new QTreeWidgetItem(paramItem, {"比特深度", QString("%1 bits").arg(av_get_bits_per_pixel(av_pix_fmt_desc_get((AVPixelFormat)codecParams->format)))});
+    new QTreeWidgetItem(paramItem, {"色度子采样", getChromaSamplingName(codecParams->format)});
+}
+
+// 辅助函数：获取像素格式名称
+QString MainWindow::getPixFmtName(int format) {
+    switch (format) {
+        case AV_PIX_FMT_YUV420P: return "YUV420P";
+        case AV_PIX_FMT_YUV422P: return "YUV422P";
+        case AV_PIX_FMT_YUV444P: return "YUV444P";
+        case AV_PIX_FMT_NV12: return "NV12";
+        case AV_PIX_FMT_NV21: return "NV21";
+        default: return QString("格式%1").arg(format);
+    }
+}
+
+// 辅助函数：获取色度子采样名称
+QString MainWindow::getChromaSamplingName(int format) {
+    switch (format) {
+        case AV_PIX_FMT_YUV420P: return "4:2:0";
+        case AV_PIX_FMT_YUV422P: return "4:2:2";
+        case AV_PIX_FMT_YUV444P: return "4:4:4";
+        case AV_PIX_FMT_NV12: return "4:2:0";
+        case AV_PIX_FMT_NV21: return "4:2:0";
+        default: return "未知";
+    }
 }
 
 void MainWindow::onStartTest() {
