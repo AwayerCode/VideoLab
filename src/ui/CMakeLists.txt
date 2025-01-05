@@ -46,8 +46,10 @@ target_link_libraries(${PROJECT_NAME}_test
         Qt6::Core
         Qt6::Widgets
         Qt6::Test
+        GTest::gtest
+        GTest::gtest_main
 )
 
 # 启用测试
-enable_testing()
-add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test) 
+include(GoogleTest)
+gtest_discover_tests(${PROJECT_NAME}_test) 

@@ -1,26 +1,37 @@
 #pragma once
 
-#include <QTest>
-#include <QSignalSpy>
+#include <gtest/gtest.h>
+#include <QApplication>
 #include "mainwindow.hpp"
 
-class MainWindowTest : public QObject {
-    Q_OBJECT
+class MainWindowTest : public ::testing::Test {
+protected:
+    static void SetUpTestSuite() {
+        qputenv("QT_QPA_PLATFORM", "offscreen");  // 使用离屏渲染
+        argc = 1;
+        argv[0] = const_cast<char*>("test");
+        app = new QApplication(argc, argv);
+    }
 
-private slots:
-    // 初始化和清理
-    void initTestCase();    // 在第一个测试函数之前调用
-    void cleanupTestCase(); // 在最后一个测试函数之后调用
-    void init();           // 每个测试函数之前调用
-    void cleanup();        // 每个测试函数之后调用
+    static void TearDownTestSuite() {
+        delete app;
+    }
 
-    // 测试用例
-    void testInitialState();           // 测试初始状态
-    void testSceneSelection();         // 测试场景选择
-    void testParameterValidation();    // 测试参数验证
-    void testProgressUpdate();         // 测试进度更新
-    void testEncoderSelection();       // 测试编码器选择
+    void SetUp() override {
+        mainWindow = new MainWindow();
+    }
 
-private:
-    MainWindow* window_;
-}; 
+    void TearDown() override {
+        delete mainWindow;
+    }
+
+    MainWindow* mainWindow;
+    static int argc;
+    static char* argv[];
+    static QApplication* app;
+};
+
+// 静态成员初始化
+int MainWindowTest::argc = 1;
+char* MainWindowTest::argv[] = {const_cast<char*>("test")};
+QApplication* MainWindowTest::app = nullptr; 

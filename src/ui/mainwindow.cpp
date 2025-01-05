@@ -32,12 +32,14 @@ void MainWindow::createEncoderGroup() {
     // 编码器选择
     auto* encoderLabel = new QLabel("编码器:", encoderGroup_);
     encoderCombo_ = new QComboBox(encoderGroup_);
+    encoderCombo_->setObjectName("encoderCombo_");
     encoderCombo_->addItem("x264 (CPU)");
     encoderCombo_->addItem("NVENC (GPU)");
 
     // 场景选择
     auto* sceneLabel = new QLabel("预设场景:", encoderGroup_);
     sceneCombo_ = new QComboBox(encoderGroup_);
+    sceneCombo_->setObjectName("sceneCombo_");
     sceneCombo_->addItem("自定义");
     sceneCombo_->addItem("直播场景");
     sceneCombo_->addItem("点播场景");
@@ -60,16 +62,19 @@ void MainWindow::createParameterGroup() {
     // 分辨率设置
     auto* resLabel = new QLabel("分辨率:", paramGroup_);
     widthSpin_ = new QSpinBox(paramGroup_);
+    widthSpin_->setObjectName("widthSpin_");
     widthSpin_->setRange(320, 3840);
     widthSpin_->setValue(1920);
     auto* xLabel = new QLabel("x", paramGroup_);
     heightSpin_ = new QSpinBox(paramGroup_);
+    heightSpin_->setObjectName("heightSpin_");
     heightSpin_->setRange(240, 2160);
     heightSpin_->setValue(1080);
 
     // 帧数设置
     auto* frameLabel = new QLabel("测试帧数:", paramGroup_);
     frameCountSpin_ = new QSpinBox(paramGroup_);
+    frameCountSpin_->setObjectName("frameCountSpin_");
     frameCountSpin_->setRange(30, 3000);
     frameCountSpin_->setValue(300);
     frameCountSpin_->setSingleStep(30);
@@ -77,11 +82,13 @@ void MainWindow::createParameterGroup() {
     // 线程数设置
     auto* threadLabel = new QLabel("线程数:", paramGroup_);
     threadsSpin_ = new QSpinBox(paramGroup_);
+    threadsSpin_->setObjectName("threadsSpin_");
     threadsSpin_->setRange(1, 32);
     threadsSpin_->setValue(20);
 
     // 硬件加速选项
     hwAccelCheck_ = new QCheckBox("启用硬件加速", paramGroup_);
+    hwAccelCheck_->setObjectName("hwAccelCheck_");
 
     // 布局
     int row = 0;
@@ -109,7 +116,9 @@ void MainWindow::createTestGroup() {
     auto* layout = new QVBoxLayout(testGroup_);
 
     startButton_ = new QPushButton("开始测试", testGroup_);
+    startButton_->setObjectName("startButton_");
     progressBar_ = new QProgressBar(testGroup_);
+    progressBar_->setObjectName("progressBar_");
     progressBar_->setRange(0, 100);
     progressBar_->setValue(0);
 
