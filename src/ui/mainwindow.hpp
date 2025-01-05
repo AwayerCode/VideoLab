@@ -22,6 +22,9 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override = default;
 
+signals:
+    void progressUpdated(int progress, double fps, double bitrate);
+
 private slots:
     void onStartTest();
     void onSceneChanged(int index);

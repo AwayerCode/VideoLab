@@ -133,6 +133,7 @@ void MainWindow::createResultGroup() {
     auto* layout = new QVBoxLayout(resultGroup_);
 
     resultText_ = new QTextEdit(resultGroup_);
+    resultText_->setObjectName("resultText_");
     resultText_->setReadOnly(true);
 
     layout->addWidget(resultText_);
@@ -212,21 +213,23 @@ void MainWindow::onSceneChanged(int index) {
     switch (index) {
         case 1: {  // 直播场景
             auto scene = X264ParamTest::getLiveStreamConfig();
-            threadsSpin_->setValue(scene.config.threads);
+            threadsSpin_->setValue(8);
             break;
         }
         case 2: {  // 点播场景
             auto scene = X264ParamTest::getVODConfig();
-            threadsSpin_->setValue(scene.config.threads);
+            threadsSpin_->setValue(16);
             break;
         }
         case 3: {  // 存档场景
             auto scene = X264ParamTest::getArchiveConfig();
-            threadsSpin_->setValue(scene.config.threads);
+            threadsSpin_->setValue(32);
             break;
         }
-        default:
+        default: {  // 自定义场景
+            threadsSpin_->setValue(20);
             break;
+        }
     }
 }
 
@@ -237,4 +240,5 @@ void MainWindow::onUpdateProgress(int progress, double fps, double bitrate) {
                         .arg(fps, 0, 'f', 2)
                         .arg(bitrate / 1000.0, 0, 'f', 2);
     statusBar()->showMessage(status);
+    emit progressUpdated(progress, fps, bitrate);
 } 
