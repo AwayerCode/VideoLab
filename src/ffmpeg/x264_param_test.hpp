@@ -114,6 +114,13 @@ public:
         std::string errorMessage;
     };
 
+    // 预定义场景配置
+    struct SceneConfig {
+        std::string name;        // 场景名称
+        TestConfig config;       // 编码配置
+        std::string description; // 场景描述
+    };
+
     X264ParamTest();
     ~X264ParamTest();
 
@@ -159,6 +166,57 @@ public:
     static std::vector<TestResult> runQualityTest(
         const TestConfig& baseConfig,
         std::vector<std::pair<std::string, std::vector<bool>>> params
+    );
+
+    // 获取预定义场景配置
+    static SceneConfig getLiveStreamConfig() {
+        SceneConfig cfg;
+        cfg.name = "直播场景";
+        cfg.description = "低延迟，稳定码率，适合实时传输";
+        cfg.config.preset = Preset::VeryFast;
+        cfg.config.tune = Tune::ZeroLatency;
+        cfg.config.rateControl = RateControl::CBR;
+        cfg.config.bitrate = 4000000;  // 4Mbps
+        cfg.config.keyintMax = 60;     // 2秒一个关键帧
+        cfg.config.bframes = 0;        // 禁用B帧减少延迟
+        cfg.config.refs = 1;           // 最小参考帧
+        return cfg;
+    }
+
+    static SceneConfig getVODConfig() {
+        SceneConfig cfg;
+        cfg.name = "点播场景";
+        cfg.description = "平衡质量和码率，适合视频网站";
+        cfg.config.preset = Preset::Medium;
+        cfg.config.rateControl = RateControl::CRF;
+        cfg.config.crf = 23;
+        cfg.config.keyintMax = 250;
+        cfg.config.bframes = 3;
+        cfg.config.refs = 3;
+        return cfg;
+    }
+
+    static SceneConfig getArchiveConfig() {
+        SceneConfig cfg;
+        cfg.name = "存档场景";
+        cfg.description = "最高质量，适合视频存档";
+        cfg.config.preset = Preset::Slow;
+        cfg.config.rateControl = RateControl::CRF;
+        cfg.config.crf = 18;
+        cfg.config.keyintMax = 250;
+        cfg.config.bframes = 8;
+        cfg.config.refs = 16;
+        cfg.config.meRange = 24;
+        cfg.config.weightedPred = true;
+        return cfg;
+    }
+
+    // 运行场景测试
+    static std::vector<TestResult> runSceneTest(
+        const std::vector<SceneConfig>& scenes,
+        int width = 1920,
+        int height = 1080,
+        int frameCount = 300
     );
 
 private:

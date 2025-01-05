@@ -1,5 +1,6 @@
 #include "encoder_test.hpp"
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <random>
 
