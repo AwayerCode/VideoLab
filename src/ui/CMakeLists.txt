@@ -1,7 +1,7 @@
 project(cp_ui)
 
 # 查找Qt包
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Test Multimedia MultimediaWidgets)
 
 # 收集源文件
 set(SOURCES
@@ -26,6 +26,8 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Qt6::Core
         Qt6::Widgets
+        Qt6::Multimedia
+        Qt6::MultimediaWidgets
         cp_ffmpeg
 )
 

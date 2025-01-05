@@ -27,6 +27,9 @@ void MainWindow::setupUI() {
 
     // 创建格式解析页面
     createFormatAnalysisTab();
+
+    // 创建播放器页面
+    createPlayerTab();
 }
 
 void MainWindow::createEncoderTestTab() {
@@ -566,4 +569,125 @@ void MainWindow::onUpdateProgress(int progress, double fps, double bitrate) {
                         .arg(bitrate / 1000.0, 0, 'f', 2);
     statusBar()->showMessage(status);
     emit progressUpdated(progress, fps, bitrate);
+}
+
+void MainWindow::createPlayerTab() {
+    playerTab_ = new QWidget();
+    playerLayout_ = new QVBoxLayout(playerTab_);
+    playerLayout_->setSpacing(6);
+    playerLayout_->setContentsMargins(6, 6, 6, 6);
+
+    // 创建视频播放控件
+    videoWidget_ = new QVideoWidget(playerTab_);
+    videoWidget_->setMinimumHeight(400);
+    playerLayout_->addWidget(videoWidget_);
+
+    // 创建媒体播放器
+    mediaPlayer_ = new QMediaPlayer(this);
+    mediaPlayer_->setVideoOutput(videoWidget_);
+
+    // 创建控制栏
+    auto* controlLayout = new QHBoxLayout();
+    controlLayout->setSpacing(6);
+
+    // 选择文件按钮
+    selectVideoButton_ = new QPushButton("选择视频", playerTab_);
+    selectVideoButton_->setMaximumWidth(80);
+
+    // 播放/暂停按钮
+    playPauseButton_ = new QPushButton("播放", playerTab_);
+    playPauseButton_->setMaximumWidth(80);
+    playPauseButton_->setEnabled(false);
+
+    // 时间标签
+    timeLabel_ = new QLabel("00:00:00", playerTab_);
+    timeLabel_->setMinimumWidth(60);
+    durationLabel_ = new QLabel("00:00:00", playerTab_);
+    durationLabel_->setMinimumWidth(60);
+
+    // 进度滑块
+    positionSlider_ = new QSlider(Qt::Horizontal, playerTab_);
+    positionSlider_->setEnabled(false);
+
+    // 添加到控制栏布局
+    controlLayout->addWidget(selectVideoButton_);
+    controlLayout->addWidget(playPauseButton_);
+    controlLayout->addWidget(timeLabel_);
+    controlLayout->addWidget(positionSlider_);
+    controlLayout->addWidget(durationLabel_);
+
+    playerLayout_->addLayout(controlLayout);
+
+    // 连接信号和槽
+    connect(selectVideoButton_, &QPushButton::clicked, this, &MainWindow::onSelectVideoFile);
+    connect(playPauseButton_, &QPushButton::clicked, this, &MainWindow::onPlayPause);
+    connect(mediaPlayer_, &QMediaPlayer::positionChanged, this, &MainWindow::onPositionChanged);
+    connect(mediaPlayer_, &QMediaPlayer::durationChanged, this, &MainWindow::onDurationChanged);
+    connect(positionSlider_, &QSlider::sliderMoved, this, &MainWindow::onSliderMoved);
+    connect(mediaPlayer_, &QMediaPlayer::playbackStateChanged, this, &MainWindow::onPlayerStateChanged);
+
+    tabWidget_->addTab(playerTab_, "视频播放");
+}
+
+void MainWindow::onSelectVideoFile() {
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        "选择视频文件",
+        QString(),
+        "视频文件 (*.mp4 *.avi *.mkv *.mov *.wmv);;所有文件 (*.*)"
+    );
+
+    if (!filePath.isEmpty()) {
+        mediaPlayer_->setSource(QUrl::fromLocalFile(filePath));
+        playPauseButton_->setEnabled(true);
+        playPauseButton_->setText("播放");
+    }
+}
+
+void MainWindow::onPlayPause() {
+    if (mediaPlayer_->playbackState() == QMediaPlayer::PlayingState) {
+        mediaPlayer_->pause();
+    } else {
+        mediaPlayer_->play();
+    }
+}
+
+void MainWindow::onPositionChanged(qint64 position) {
+    if (!positionSlider_->isSliderDown()) {
+        positionSlider_->setValue(position);
+    }
+    timeLabel_->setText(formatTime(position));
+}
+
+void MainWindow::onDurationChanged(qint64 duration) {
+    positionSlider_->setRange(0, duration);
+    positionSlider_->setEnabled(true);
+    durationLabel_->setText(formatTime(duration));
+}
+
+void MainWindow::onSliderMoved(int position) {
+    mediaPlayer_->setPosition(position);
+}
+
+void MainWindow::onPlayerStateChanged(QMediaPlayer::PlaybackState state) {
+    switch (state) {
+        case QMediaPlayer::PlayingState:
+            playPauseButton_->setText("暂停");
+            break;
+        case QMediaPlayer::PausedState:
+        case QMediaPlayer::StoppedState:
+            playPauseButton_->setText("播放");
+            break;
+    }
+}
+
+QString MainWindow::formatTime(qint64 ms) {
+    qint64 seconds = ms / 1000;
+    qint64 minutes = seconds / 60;
+    qint64 hours = minutes / 60;
+
+    return QString("%1:%2:%3")
+        .arg(hours, 2, 10, QChar('0'))
+        .arg(minutes % 60, 2, 10, QChar('0'))
+        .arg(seconds % 60, 2, 10, QChar('0'));
 } 

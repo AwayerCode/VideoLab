@@ -18,6 +18,9 @@
 #include <QTabWidget>
 #include <QTreeWidget>
 #include <QSplitter>
+#include <QtMultimediaWidgets/QVideoWidget>
+#include <QtMultimedia/QMediaPlayer>
+#include <QSlider>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -39,11 +42,18 @@ private slots:
     void onUpdateProgress(int progress, double fps, double bitrate);
     void onSelectFile();
     void onAnalyzeFile();
+    void onSelectVideoFile();
+    void onPlayPause();
+    void onPositionChanged(qint64 position);
+    void onDurationChanged(qint64 duration);
+    void onSliderMoved(int position);
+    void onPlayerStateChanged(QMediaPlayer::PlaybackState state);
 
 private:
     void setupUI();
     void createEncoderTestTab();
     void createFormatAnalysisTab();
+    void createPlayerTab();
     void createFileGroup();
     void createEncoderGroup();
     void createParameterGroup();
@@ -52,6 +62,7 @@ private:
     void updateH264Details(AVCodecParameters* codecParams, QTreeWidgetItem* parent);
     QString getPixFmtName(int format);
     QString getChromaSamplingName(int format);
+    QString formatTime(qint64 ms);
 
     // UI 组件
     QWidget* centralWidget_;
@@ -68,6 +79,17 @@ private:
     QSplitter* formatAnalysisSplitter_;
     QTreeWidget* formatTree_;
     QTextEdit* resultText_;
+
+    // 播放器页面
+    QWidget* playerTab_;
+    QVBoxLayout* playerLayout_;
+    QVideoWidget* videoWidget_;
+    QMediaPlayer* mediaPlayer_;
+    QPushButton* selectVideoButton_;
+    QPushButton* playPauseButton_;
+    QSlider* positionSlider_;
+    QLabel* timeLabel_;
+    QLabel* durationLabel_;
 
     // 文件选择组
     QGroupBox* fileGroup_;
