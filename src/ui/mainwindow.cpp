@@ -1,6 +1,10 @@
 #include "mainwindow.hpp"
 #include "../ffmpeg/x264_param_test.hpp"
+#include "../ffmpeg/ffmpeg.hpp"
 #include <QMessageBox>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMimeDatabase>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -14,6 +18,7 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::setupUI() {
+    createFileGroup();
     createEncoderGroup();
     createParameterGroup();
     createTestGroup();
@@ -23,6 +28,126 @@ void MainWindow::setupUI() {
     connect(startButton_, &QPushButton::clicked, this, &MainWindow::onStartTest);
     connect(sceneCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onSceneChanged);
+    connect(selectFileButton_, &QPushButton::clicked, this, &MainWindow::onSelectFile);
+    connect(analyzeButton_, &QPushButton::clicked, this, &MainWindow::onAnalyzeFile);
+}
+
+void MainWindow::createFileGroup() {
+    fileGroup_ = new QGroupBox("视频文件", centralWidget_);
+    auto* layout = new QHBoxLayout(fileGroup_);
+
+    filePathEdit_ = new QLineEdit(fileGroup_);
+    filePathEdit_->setObjectName("filePathEdit_");
+    filePathEdit_->setReadOnly(true);
+    filePathEdit_->setPlaceholderText("请选择视频文件...");
+
+    selectFileButton_ = new QPushButton("选择文件", fileGroup_);
+    selectFileButton_->setObjectName("selectFileButton_");
+
+    analyzeButton_ = new QPushButton("解析文件", fileGroup_);
+    analyzeButton_->setObjectName("analyzeButton_");
+    analyzeButton_->setEnabled(false);
+
+    layout->addWidget(filePathEdit_);
+    layout->addWidget(selectFileButton_);
+    layout->addWidget(analyzeButton_);
+
+    mainLayout_->addWidget(fileGroup_);
+}
+
+void MainWindow::onSelectFile() {
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        "选择视频文件",
+        QString(),
+        "视频文件 (*.mp4 *.avi *.mkv *.mov *.wmv);;所有文件 (*.*)"
+    );
+
+    if (!filePath.isEmpty()) {
+        filePathEdit_->setText(filePath);
+        analyzeButton_->setEnabled(true);
+    }
+}
+
+void MainWindow::onAnalyzeFile() {
+    QString filePath = filePathEdit_->text();
+    if (filePath.isEmpty()) {
+        QMessageBox::warning(this, "错误", "请先选择视频文件");
+        return;
+    }
+
+    QFileInfo fileInfo(filePath);
+    QMimeDatabase db;
+    QString mimeType = db.mimeTypeForFile(filePath).name();
+
+    QString resultStr;
+    resultStr += QString("文件信息:\n");
+    resultStr += QString("文件名: %1\n").arg(fileInfo.fileName());
+    resultStr += QString("文件大小: %1 MB\n").arg(fileInfo.size() / 1024.0 / 1024.0, 0, 'f', 2);
+    resultStr += QString("MIME类型: %1\n").arg(mimeType);
+    resultStr += QString("创建时间: %1\n").arg(fileInfo.birthTime().toString("yyyy-MM-dd hh:mm:ss"));
+    resultStr += QString("修改时间: %1\n").arg(fileInfo.lastModified().toString("yyyy-MM-dd hh:mm:ss"));
+    resultStr += QString("\n正在分析视频格式...\n");
+
+    // 使用FFmpeg分析视频文件
+    FFmpeg ffmpeg;
+    if (ffmpeg.openFile(filePath.toStdString())) {
+        AVFormatContext* formatContext = ffmpeg.getFormatContext();
+        if (formatContext) {
+            resultStr += QString("\n视频格式信息:\n");
+            resultStr += QString("格式: %1\n").arg(formatContext->iformat->long_name);
+            resultStr += QString("时长: %1 秒\n").arg(formatContext->duration / 1000000.0, 0, 'f', 2);
+            resultStr += QString("比特率: %1 Kbps\n").arg(formatContext->bit_rate / 1000);
+            resultStr += QString("流数量: %1\n").arg(formatContext->nb_streams);
+
+            // 分析每个流
+            for (unsigned int i = 0; i < formatContext->nb_streams; i++) {
+                AVStream* stream = formatContext->streams[i];
+                AVCodecParameters* codecParams = stream->codecpar;
+                const AVCodec* codec = avcodec_find_decoder(codecParams->codec_id);
+
+                resultStr += QString("\n流 #%1\n").arg(i);
+                switch (codecParams->codec_type) {
+                    case AVMEDIA_TYPE_VIDEO:
+                        resultStr += QString("类型: 视频\n");
+                        if (codec) {
+                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                        }
+                        resultStr += QString("分辨率: %1x%2\n").arg(codecParams->width).arg(codecParams->height);
+                        if (stream->avg_frame_rate.num && stream->avg_frame_rate.den) {
+                            resultStr += QString("帧率: %1 fps\n")
+                                .arg(av_q2d(stream->avg_frame_rate), 0, 'f', 2);
+                        }
+                        break;
+
+                    case AVMEDIA_TYPE_AUDIO:
+                        resultStr += QString("类型: 音频\n");
+                        if (codec) {
+                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                        }
+                        resultStr += QString("采样率: %1 Hz\n").arg(codecParams->sample_rate);
+                        resultStr += QString("声道数: %1\n").arg(codecParams->ch_layout.nb_channels);
+                        break;
+
+                    case AVMEDIA_TYPE_SUBTITLE:
+                        resultStr += QString("类型: 字幕\n");
+                        if (codec) {
+                            resultStr += QString("编码器: %1\n").arg(codec->long_name);
+                        }
+                        break;
+
+                    default:
+                        resultStr += QString("类型: 其他\n");
+                        break;
+                }
+            }
+        }
+        ffmpeg.closeFile();
+    } else {
+        resultStr += QString("\n无法打开文件进行分析，请确保文件格式正确且未被损坏。");
+    }
+
+    resultText_->setText(resultStr);
 }
 
 void MainWindow::createEncoderGroup() {

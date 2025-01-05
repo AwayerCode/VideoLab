@@ -14,6 +14,7 @@
 #include <QCheckBox>
 #include <QStatusBar>
 #include <QGridLayout>
+#include <QLineEdit>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,9 +30,12 @@ private slots:
     void onStartTest();
     void onSceneChanged(int index);
     void onUpdateProgress(int progress, double fps, double bitrate);
+    void onSelectFile();
+    void onAnalyzeFile();
 
 private:
     void setupUI();
+    void createFileGroup();
     void createEncoderGroup();
     void createParameterGroup();
     void createTestGroup();
@@ -40,6 +44,12 @@ private:
     // UI 组件
     QWidget* centralWidget_;
     QVBoxLayout* mainLayout_;
+
+    // 文件选择组
+    QGroupBox* fileGroup_;
+    QLineEdit* filePathEdit_;
+    QPushButton* selectFileButton_;
+    QPushButton* analyzeButton_;
 
     // 编码器选择组
     QGroupBox* encoderGroup_;

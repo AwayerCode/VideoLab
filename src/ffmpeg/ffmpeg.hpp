@@ -21,6 +21,8 @@ public:
     void closeFile();
     // 读取下一帧
     bool readFrame();
+    // 获取格式上下文
+    AVFormatContext* getFormatContext() const { return formatContext_; }
 
 private:
     AVFormatContext* formatContext_{nullptr};
