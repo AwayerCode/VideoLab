@@ -11,8 +11,41 @@
 #include <QMediaPlayer>
 #include <QVideoWidget>
 #include <QSlider>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include "../ffmpeg/x264_param_test.hpp"
 #include <thread>
+
+// 历史记录结构体
+struct EncodingRecord {
+    // 输入参数
+    int width;
+    int height;
+    int frameCount;
+    QString preset;
+    QString tune;
+    int threads;
+    QString rateControl;
+    int rateValue;
+    
+    // 编码结果
+    double encodingTime;
+    double fps;
+    double bitrate;
+    double psnr;
+    double ssim;
+    QString outputFile;
+    
+    // 时间戳
+    QDateTime timestamp;
+};
 
 class X264ConfigWindow : public QMainWindow {
     Q_OBJECT
@@ -21,7 +54,7 @@ public:
     explicit X264ConfigWindow(QWidget *parent = nullptr);
     ~X264ConfigWindow() override;
 
-private slots:
+public Q_SLOTS:
     void onStartEncoding();
     void onStopEncoding();
     void onRateControlChanged(int index);
@@ -34,46 +67,50 @@ private slots:
     void appendLog(const QString& text);
     void onEncodingFinished();
     void onGenerateFrames();
+    void addEncodingRecord(const EncodingRecord& record);
+    void clearEncodingHistory();
+    void exportEncodingHistory();
+    void loadEncodingHistory();
 
 private:
     void setupUI();
     void createConnections();
     void updateUIFromConfig(const X264ParamTest::TestConfig& config);
     X264ParamTest::TestConfig getConfigFromUI() const;
+    void setupHistoryUI();
+    void updateHistoryTable();
+    void saveHistoryToFile();
 
     // 基本参数控件
     QComboBox* presetCombo_{};
     QComboBox* tuneCombo_{};
     QSpinBox* threadsSpinBox_{};
-    
-    // 视频参数控件
     QSpinBox* widthSpinBox_{};
     QSpinBox* heightSpinBox_{};
     QSpinBox* frameCountSpinBox_{};
-    
-    // 码率控制控件
     QComboBox* rateControlCombo_{};
     QSpinBox* rateValueSpinBox_{};
-    
-    // GOP参数控件
     QSpinBox* keyintMaxSpinBox_{};
     QSpinBox* bframesSpinBox_{};
     QSpinBox* refsSpinBox_{};
-    
-    // 质量参数控件
     QCheckBox* fastFirstPassCheckBox_{};
     QSpinBox* meRangeSpinBox_{};
     QCheckBox* weightedPredCheckBox_{};
     QCheckBox* cabacCheckBox_{};
-    
-    // 场景配置控件
     QComboBox* sceneConfigCombo_{};
-    
+
     // 编码控制控件
     QPushButton* startButton_{};
     QPushButton* stopButton_{};
     QProgressBar* progressBar_{};
     QTextEdit* logTextEdit_{};
+    bool shouldStop_{false};
+    std::thread encodingThread_{};
+
+    // 帧生成控件
+    QLabel* frameGenStatusLabel_{};
+    QProgressBar* frameGenProgressBar_{};
+    QPushButton* generateButton_{};
 
     // 视频播放控件
     QVideoWidget* videoWidget_{};
@@ -81,18 +118,11 @@ private:
     QPushButton* playButton_{};
     QSlider* videoSlider_{};
     QLabel* timeLabel_{};
+    QString currentOutputFile_{};
 
-    // 编码控制
-    bool shouldStop_{false};
-
-    // 当前输出文件
-    QString currentOutputFile_;
-
-    // 帧生成控件
-    QProgressBar* frameGenProgressBar_{};
-    QPushButton* generateButton_{};
-    QLabel* frameGenStatusLabel_{};
-
-    // 编码线程
-    std::thread encodingThread_;
+    // 历史记录控件
+    QTableWidget* historyTable_{};
+    QPushButton* clearHistoryButton_{};
+    QPushButton* exportHistoryButton_{};
+    std::vector<EncodingRecord> encodingHistory_;
 }; 

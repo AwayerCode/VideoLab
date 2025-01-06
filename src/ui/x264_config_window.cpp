@@ -13,12 +13,18 @@
 #include <QVideoWidget>
 #include <QMediaPlayer>
 #include <QTimer>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QFileDialog>
+#include <QTextStream>
 
 X264ConfigWindow::X264ConfigWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setupUI();
     createConnections();
+    setupHistoryUI();
     
     // 设置默认配置
     X264ParamTest::TestConfig defaultConfig;
@@ -39,9 +45,11 @@ void X264ConfigWindow::setupUI()
     
     auto* mainLayout = new QHBoxLayout(centralWidget);
     auto* leftLayout = new QVBoxLayout();
+    auto* middleLayout = new QVBoxLayout();
     auto* rightLayout = new QVBoxLayout();
-    mainLayout->addLayout(leftLayout, 2);
-    mainLayout->addLayout(rightLayout, 1);
+    mainLayout->addLayout(leftLayout, 2);  // 参数设置
+    mainLayout->addLayout(middleLayout, 2); // 历史记录
+    mainLayout->addLayout(rightLayout, 2);  // 编码控制
     
     // 左侧参数设置区域
     // 基本参数组
@@ -149,7 +157,48 @@ void X264ConfigWindow::setupUI()
     leftLayout->addWidget(gopGroup);
     leftLayout->addWidget(qualityGroup);
     
-    // 右侧控制和显示区域
+    // 中间历史记录区域
+    auto* historyGroup = new QGroupBox(tr("编码历史记录"), this);
+    auto* historyLayout = new QVBoxLayout(historyGroup);
+    
+    // 创建历史记录表格
+    historyTable_ = new QTableWidget(this);
+    historyTable_->setColumnCount(10);
+    historyTable_->setHorizontalHeaderLabels({
+        tr("时间"),
+        tr("分辨率"),
+        tr("帧数"),
+        tr("预设"),
+        tr("调优"),
+        tr("码率控制"),
+        tr("编码时间(s)"),
+        tr("速度(fps)"),
+        tr("码率(kbps)"),
+        tr("PSNR/SSIM")
+    });
+    
+    // 设置表格属性
+    historyTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    historyTable_->setSelectionMode(QAbstractItemView::SingleSelection);
+    historyTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    historyTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    historyTable_->verticalHeader()->setVisible(false);
+    historyTable_->setAlternatingRowColors(true);
+    
+    // 添加历史记录控制按钮
+    auto* historyButtonLayout = new QHBoxLayout();
+    clearHistoryButton_ = new QPushButton(tr("清除历史"), this);
+    exportHistoryButton_ = new QPushButton(tr("导出历史"), this);
+    historyButtonLayout->addWidget(clearHistoryButton_);
+    historyButtonLayout->addWidget(exportHistoryButton_);
+    
+    historyLayout->addWidget(historyTable_);
+    historyLayout->addLayout(historyButtonLayout);
+    
+    middleLayout->addWidget(historyGroup);
+    
+    // 右侧编码控制区域
+    // 场景选择
     sceneConfigCombo_ = new QComboBox(this);
     sceneConfigCombo_->addItems({
         tr("默认配置"),
@@ -224,8 +273,7 @@ void X264ConfigWindow::setupUI()
     
     // 设置窗口属性
     setWindowTitle(tr("X264编码器配置"));
-    setFixedSize(800, 600);  // 固定窗口大小
-    setWindowFlags(windowFlags() & ~Qt::WindowMaximizeButtonHint);  // 禁用最大化按钮
+    resize(1200, 800);  // 增加窗口大小以适应新的布局
 }
 
 void X264ConfigWindow::createConnections()
@@ -642,4 +690,172 @@ void X264ConfigWindow::onGenerateFrames()
             }, Qt::QueuedConnection);
         }
     }).detach();
+}
+
+void X264ConfigWindow::setupHistoryUI()
+{
+    // 连接历史记录相关的信号槽
+    connect(clearHistoryButton_, &QPushButton::clicked, this, &X264ConfigWindow::clearEncodingHistory);
+    connect(exportHistoryButton_, &QPushButton::clicked, this, &X264ConfigWindow::exportEncodingHistory);
+    
+    // 加载历史记录
+    loadEncodingHistory();
+}
+
+void X264ConfigWindow::addEncodingRecord(const EncodingRecord& record)
+{
+    // 添加到历史记录向量
+    encodingHistory_.push_back(record);
+    
+    // 添加到表格
+    int row = historyTable_->rowCount();
+    historyTable_->insertRow(row);
+    
+    // 设置单元格内容
+    historyTable_->setItem(row, 0, new QTableWidgetItem(record.timestamp.toString("yyyy-MM-dd HH:mm:ss")));
+    historyTable_->setItem(row, 1, new QTableWidgetItem(QString("%1x%2").arg(record.width).arg(record.height)));
+    historyTable_->setItem(row, 2, new QTableWidgetItem(QString::number(record.frameCount)));
+    historyTable_->setItem(row, 3, new QTableWidgetItem(record.preset));
+    historyTable_->setItem(row, 4, new QTableWidgetItem(record.tune));
+    historyTable_->setItem(row, 5, new QTableWidgetItem(record.rateControl));
+    historyTable_->setItem(row, 6, new QTableWidgetItem(QString::number(record.encodingTime, 'f', 2)));
+    historyTable_->setItem(row, 7, new QTableWidgetItem(QString::number(record.fps, 'f', 1)));
+    historyTable_->setItem(row, 8, new QTableWidgetItem(QString::number(record.bitrate / 1000.0, 'f', 0)));
+    historyTable_->setItem(row, 9, new QTableWidgetItem(QString("%1/%2").arg(record.psnr, 0, 'f', 2).arg(record.ssim, 0, 'f', 3)));
+    
+    // 保存到文件
+    saveHistoryToFile();
+}
+
+void X264ConfigWindow::clearEncodingHistory()
+{
+    if (QMessageBox::question(this, tr("确认"), tr("确定要清除所有历史记录吗？")) == QMessageBox::Yes) {
+        encodingHistory_.clear();
+        historyTable_->setRowCount(0);
+        saveHistoryToFile();
+    }
+}
+
+void X264ConfigWindow::exportEncodingHistory()
+{
+    QString fileName = QFileDialog::getSaveFileName(this,
+        tr("导出历史记录"), QDir::homePath(), tr("CSV文件 (*.csv)"));
+        
+    if (fileName.isEmpty()) {
+        return;
+    }
+    
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("错误"), tr("无法创建文件"));
+        return;
+    }
+    
+    QTextStream out(&file);
+    
+    // 写入表头
+    out << "时间,分辨率,帧数,预设,调优,码率控制,编码时间(s),速度(fps),码率(kbps),PSNR,SSIM\n";
+    
+    // 写入数据
+    for (const auto& record : encodingHistory_) {
+        out << record.timestamp.toString("yyyy-MM-dd HH:mm:ss") << ","
+            << record.width << "x" << record.height << ","
+            << record.frameCount << ","
+            << record.preset << ","
+            << record.tune << ","
+            << record.rateControl << ","
+            << QString::number(record.encodingTime, 'f', 2) << ","
+            << QString::number(record.fps, 'f', 1) << ","
+            << QString::number(record.bitrate / 1000.0, 'f', 0) << ","
+            << QString::number(record.psnr, 'f', 2) << ","
+            << QString::number(record.ssim, 'f', 3) << "\n";
+    }
+    
+    QMessageBox::information(this, tr("成功"), tr("历史记录已导出"));
+}
+
+void X264ConfigWindow::loadEncodingHistory()
+{
+    QString filePath = QDir::homePath() + "/.x264_encoding_history.json";
+    QFile file(filePath);
+    
+    if (!file.open(QIODevice::ReadOnly)) {
+        return; // 文件不存在或无法打开，直接返回
+    }
+    
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isArray()) {
+        return;
+    }
+    
+    encodingHistory_.clear();
+    QJsonArray historyArray = doc.array();
+    
+    for (const auto& value : historyArray) {
+        QJsonObject obj = value.toObject();
+        EncodingRecord record;
+        
+        record.timestamp = QDateTime::fromString(obj["timestamp"].toString(), Qt::ISODate);
+        record.width = obj["width"].toInt();
+        record.height = obj["height"].toInt();
+        record.frameCount = obj["frameCount"].toInt();
+        record.preset = obj["preset"].toString();
+        record.tune = obj["tune"].toString();
+        record.threads = obj["threads"].toInt();
+        record.rateControl = obj["rateControl"].toString();
+        record.rateValue = obj["rateValue"].toInt();
+        record.encodingTime = obj["encodingTime"].toDouble();
+        record.fps = obj["fps"].toDouble();
+        record.bitrate = obj["bitrate"].toDouble();
+        record.psnr = obj["psnr"].toDouble();
+        record.ssim = obj["ssim"].toDouble();
+        record.outputFile = obj["outputFile"].toString();
+        
+        encodingHistory_.push_back(record);
+    }
+    
+    updateHistoryTable();
+}
+
+void X264ConfigWindow::updateHistoryTable()
+{
+    historyTable_->setRowCount(0);
+    for (const auto& record : encodingHistory_) {
+        addEncodingRecord(record);
+    }
+}
+
+void X264ConfigWindow::saveHistoryToFile()
+{
+    QString filePath = QDir::homePath() + "/.x264_encoding_history.json";
+    QFile file(filePath);
+    
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "无法保存编码历史到文件:" << filePath;
+        return;
+    }
+    
+    QJsonArray historyArray;
+    for (const auto& record : encodingHistory_) {
+        QJsonObject recordObj;
+        recordObj["timestamp"] = record.timestamp.toString(Qt::ISODate);
+        recordObj["width"] = record.width;
+        recordObj["height"] = record.height;
+        recordObj["frameCount"] = record.frameCount;
+        recordObj["preset"] = record.preset;
+        recordObj["tune"] = record.tune;
+        recordObj["threads"] = record.threads;
+        recordObj["rateControl"] = record.rateControl;
+        recordObj["rateValue"] = record.rateValue;
+        recordObj["encodingTime"] = record.encodingTime;
+        recordObj["fps"] = record.fps;
+        recordObj["bitrate"] = record.bitrate;
+        recordObj["psnr"] = record.psnr;
+        recordObj["ssim"] = record.ssim;
+        recordObj["outputFile"] = record.outputFile;
+        historyArray.append(recordObj);
+    }
+    
+    QJsonDocument doc(historyArray);
+    file.write(doc.toJson());
 } 
