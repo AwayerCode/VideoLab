@@ -77,7 +77,6 @@ public Q_SLOTS:
     void addEncodingRecord(const EncodingRecord& record);
     void clearEncodingHistory();
     void exportEncodingHistory();
-    void loadEncodingHistory();
 
 private:
     void setupUI();
