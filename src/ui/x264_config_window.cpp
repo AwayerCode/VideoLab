@@ -43,13 +43,14 @@ void X264ConfigWindow::setupUI()
     auto* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     
-    auto* mainLayout = new QHBoxLayout(centralWidget);
+    auto* mainLayout = new QVBoxLayout(centralWidget);
+    auto* topLayout = new QHBoxLayout();
+    mainLayout->addLayout(topLayout);
+    
     auto* leftLayout = new QVBoxLayout();
-    auto* middleLayout = new QVBoxLayout();
     auto* rightLayout = new QVBoxLayout();
-    mainLayout->addLayout(leftLayout, 2);  // 参数设置
-    mainLayout->addLayout(middleLayout, 2); // 历史记录
-    mainLayout->addLayout(rightLayout, 2);  // 编码控制
+    topLayout->addLayout(leftLayout, 1);
+    topLayout->addLayout(rightLayout, 1);
     
     // 左侧参数设置区域
     // 基本参数组
@@ -157,46 +158,6 @@ void X264ConfigWindow::setupUI()
     leftLayout->addWidget(gopGroup);
     leftLayout->addWidget(qualityGroup);
     
-    // 中间历史记录区域
-    auto* historyGroup = new QGroupBox(tr("编码历史记录"), this);
-    auto* historyLayout = new QVBoxLayout(historyGroup);
-    
-    // 创建历史记录表格
-    historyTable_ = new QTableWidget(this);
-    historyTable_->setColumnCount(10);
-    historyTable_->setHorizontalHeaderLabels({
-        tr("时间"),
-        tr("分辨率"),
-        tr("帧数"),
-        tr("预设"),
-        tr("调优"),
-        tr("码率控制"),
-        tr("编码时间(s)"),
-        tr("速度(fps)"),
-        tr("码率(kbps)"),
-        tr("PSNR/SSIM")
-    });
-    
-    // 设置表格属性
-    historyTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    historyTable_->setSelectionMode(QAbstractItemView::SingleSelection);
-    historyTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    historyTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    historyTable_->verticalHeader()->setVisible(false);
-    historyTable_->setAlternatingRowColors(true);
-    
-    // 添加历史记录控制按钮
-    auto* historyButtonLayout = new QHBoxLayout();
-    clearHistoryButton_ = new QPushButton(tr("清除历史"), this);
-    exportHistoryButton_ = new QPushButton(tr("导出历史"), this);
-    historyButtonLayout->addWidget(clearHistoryButton_);
-    historyButtonLayout->addWidget(exportHistoryButton_);
-    
-    historyLayout->addWidget(historyTable_);
-    historyLayout->addLayout(historyButtonLayout);
-    
-    middleLayout->addWidget(historyGroup);
-    
     // 右侧编码控制区域
     // 场景选择
     sceneConfigCombo_ = new QComboBox(this);
@@ -271,9 +232,66 @@ void X264ConfigWindow::setupUI()
     
     rightLayout->addLayout(playControlLayout);
     
+    // 底部历史记录区域
+    auto* historyGroup = new QGroupBox(tr("编码历史记录"), this);
+    auto* historyLayout = new QVBoxLayout(historyGroup);
+    
+    // 创建历史记录表格
+    historyTable_ = new QTableWidget(this);
+    historyTable_->setColumnCount(15);  // 增加列数
+    historyTable_->setHorizontalHeaderLabels({
+        tr("时间"),
+        tr("分辨率"),
+        tr("帧数"),
+        tr("预设"),
+        tr("调优"),
+        tr("线程数"),
+        tr("码率控制"),
+        tr("码率/QP值"),
+        tr("关键帧间隔"),
+        tr("B帧数"),
+        tr("参考帧数"),
+        tr("编码时间(s)"),
+        tr("速度(fps)"),
+        tr("码率(kbps)"),
+        tr("PSNR/SSIM")
+    });
+    
+    // 设置表格属性
+    historyTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    historyTable_->setSelectionMode(QAbstractItemView::SingleSelection);
+    historyTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    historyTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    historyTable_->verticalHeader()->setVisible(false);
+    historyTable_->setAlternatingRowColors(true);
+    historyTable_->setMinimumHeight(200);
+    
+    // 设置表格的工具提示
+    historyTable_->horizontalHeaderItem(3)->setToolTip(tr("编码速度预设"));
+    historyTable_->horizontalHeaderItem(4)->setToolTip(tr("场景优化调优"));
+    historyTable_->horizontalHeaderItem(6)->setToolTip(tr("码率控制模式"));
+    historyTable_->horizontalHeaderItem(7)->setToolTip(tr("CRF/CQP: 0-51, ABR/CBR: 比特率"));
+    historyTable_->horizontalHeaderItem(8)->setToolTip(tr("最大关键帧间隔"));
+    historyTable_->horizontalHeaderItem(9)->setToolTip(tr("B帧数量"));
+    historyTable_->horizontalHeaderItem(10)->setToolTip(tr("参考帧数量"));
+    historyTable_->horizontalHeaderItem(14)->setToolTip(tr("PSNR: 峰值信噪比, SSIM: 结构相似度"));
+    
+    // 添加历史记录控制按钮
+    auto* historyButtonLayout = new QHBoxLayout();
+    clearHistoryButton_ = new QPushButton(tr("清除历史"), this);
+    exportHistoryButton_ = new QPushButton(tr("导出历史"), this);
+    historyButtonLayout->addWidget(clearHistoryButton_);
+    historyButtonLayout->addWidget(exportHistoryButton_);
+    historyButtonLayout->addStretch();
+    
+    historyLayout->addWidget(historyTable_);
+    historyLayout->addLayout(historyButtonLayout);
+    
+    mainLayout->addWidget(historyGroup);
+    
     // 设置窗口属性
     setWindowTitle(tr("X264编码器配置"));
-    resize(1200, 800);  // 增加窗口大小以适应新的布局
+    resize(1400, 900);
 }
 
 void X264ConfigWindow::createConnections()
@@ -357,7 +375,7 @@ void X264ConfigWindow::onStartEncoding()
             });
         
         // 编码完成后，在主线程中更新UI
-        QMetaObject::invokeMethod(this, [this, result]() {
+        QMetaObject::invokeMethod(this, [this, result, config]() {
             if (result.success) {
                 currentOutputFile_ = QString::fromStdString(result.outputFile);
                 QString summary = QString(
@@ -375,6 +393,33 @@ void X264ConfigWindow::onStartEncoding()
                     .arg(result.ssim, 0, 'f', 3)
                     .arg(currentOutputFile_);
                 appendLog(summary);
+
+                // 添加到历史记录
+                EncodingRecord record;
+                record.timestamp = QDateTime::currentDateTime();
+                record.width = config.width;
+                record.height = config.height;
+                record.frameCount = config.frameCount;
+                record.preset = presetCombo_->currentText();
+                record.tune = tuneCombo_->currentText();
+                record.threads = config.threads;
+                record.rateControl = rateControlCombo_->currentText();
+                record.rateValue = rateValueSpinBox_->value();
+                record.keyintMax = config.keyintMax;
+                record.bframes = config.bframes;
+                record.refs = config.refs;
+                record.fastFirstPass = config.fastFirstPass;
+                record.meRange = config.meRange;
+                record.weightedPred = config.weightedPred;
+                record.cabac = config.cabac;
+                record.encodingTime = result.encodingTime;
+                record.fps = result.fps;
+                record.bitrate = result.bitrate;
+                record.psnr = result.psnr;
+                record.ssim = result.ssim;
+                record.outputFile = currentOutputFile_;
+                
+                addEncodingRecord(record);
             } else {
                 appendLog(tr("\n编码失败：%1\n").arg(QString::fromStdString(result.errorMessage)));
             }
@@ -717,11 +762,16 @@ void X264ConfigWindow::addEncodingRecord(const EncodingRecord& record)
     historyTable_->setItem(row, 2, new QTableWidgetItem(QString::number(record.frameCount)));
     historyTable_->setItem(row, 3, new QTableWidgetItem(record.preset));
     historyTable_->setItem(row, 4, new QTableWidgetItem(record.tune));
-    historyTable_->setItem(row, 5, new QTableWidgetItem(record.rateControl));
-    historyTable_->setItem(row, 6, new QTableWidgetItem(QString::number(record.encodingTime, 'f', 2)));
-    historyTable_->setItem(row, 7, new QTableWidgetItem(QString::number(record.fps, 'f', 1)));
-    historyTable_->setItem(row, 8, new QTableWidgetItem(QString::number(record.bitrate / 1000.0, 'f', 0)));
-    historyTable_->setItem(row, 9, new QTableWidgetItem(QString("%1/%2").arg(record.psnr, 0, 'f', 2).arg(record.ssim, 0, 'f', 3)));
+    historyTable_->setItem(row, 5, new QTableWidgetItem(QString::number(record.threads)));
+    historyTable_->setItem(row, 6, new QTableWidgetItem(record.rateControl));
+    historyTable_->setItem(row, 7, new QTableWidgetItem(QString::number(record.rateValue)));
+    historyTable_->setItem(row, 8, new QTableWidgetItem(QString::number(record.keyintMax)));
+    historyTable_->setItem(row, 9, new QTableWidgetItem(QString::number(record.bframes)));
+    historyTable_->setItem(row, 10, new QTableWidgetItem(QString::number(record.refs)));
+    historyTable_->setItem(row, 11, new QTableWidgetItem(QString::number(record.encodingTime, 'f', 2)));
+    historyTable_->setItem(row, 12, new QTableWidgetItem(QString::number(record.fps, 'f', 1)));
+    historyTable_->setItem(row, 13, new QTableWidgetItem(QString::number(record.bitrate / 1000.0, 'f', 0)));
+    historyTable_->setItem(row, 14, new QTableWidgetItem(QString("%1/%2").arg(record.psnr, 0, 'f', 2).arg(record.ssim, 0, 'f', 3)));
     
     // 保存到文件
     saveHistoryToFile();
@@ -754,7 +804,7 @@ void X264ConfigWindow::exportEncodingHistory()
     QTextStream out(&file);
     
     // 写入表头
-    out << "时间,分辨率,帧数,预设,调优,码率控制,编码时间(s),速度(fps),码率(kbps),PSNR,SSIM\n";
+    out << "时间,分辨率,帧数,预设,调优,线程数,码率控制,码率/QP值,关键帧间隔,B帧数,参考帧数,编码时间(s),速度(fps),码率(kbps),PSNR,SSIM\n";
     
     // 写入数据
     for (const auto& record : encodingHistory_) {
@@ -763,7 +813,12 @@ void X264ConfigWindow::exportEncodingHistory()
             << record.frameCount << ","
             << record.preset << ","
             << record.tune << ","
+            << record.threads << ","
             << record.rateControl << ","
+            << record.rateValue << ","
+            << record.keyintMax << ","
+            << record.bframes << ","
+            << record.refs << ","
             << QString::number(record.encodingTime, 'f', 2) << ","
             << QString::number(record.fps, 'f', 1) << ","
             << QString::number(record.bitrate / 1000.0, 'f', 0) << ","
@@ -804,6 +859,13 @@ void X264ConfigWindow::loadEncodingHistory()
         record.threads = obj["threads"].toInt();
         record.rateControl = obj["rateControl"].toString();
         record.rateValue = obj["rateValue"].toInt();
+        record.keyintMax = obj["keyintMax"].toInt();
+        record.bframes = obj["bframes"].toInt();
+        record.refs = obj["refs"].toInt();
+        record.fastFirstPass = obj["fastFirstPass"].toBool();
+        record.meRange = obj["meRange"].toInt();
+        record.weightedPred = obj["weightedPred"].toBool();
+        record.cabac = obj["cabac"].toBool();
         record.encodingTime = obj["encodingTime"].toDouble();
         record.fps = obj["fps"].toDouble();
         record.bitrate = obj["bitrate"].toDouble();
@@ -847,6 +909,13 @@ void X264ConfigWindow::saveHistoryToFile()
         recordObj["threads"] = record.threads;
         recordObj["rateControl"] = record.rateControl;
         recordObj["rateValue"] = record.rateValue;
+        recordObj["keyintMax"] = record.keyintMax;
+        recordObj["bframes"] = record.bframes;
+        recordObj["refs"] = record.refs;
+        recordObj["fastFirstPass"] = record.fastFirstPass;
+        recordObj["meRange"] = record.meRange;
+        recordObj["weightedPred"] = record.weightedPred;
+        recordObj["cabac"] = record.cabac;
         recordObj["encodingTime"] = record.encodingTime;
         recordObj["fps"] = record.fps;
         recordObj["bitrate"] = record.bitrate;

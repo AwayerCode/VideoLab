@@ -34,6 +34,13 @@ struct EncodingRecord {
     int threads;
     QString rateControl;
     int rateValue;
+    int keyintMax;      // 关键帧间隔
+    int bframes;        // B帧数量
+    int refs;          // 参考帧数
+    bool fastFirstPass; // 快速首遍编码
+    int meRange;       // 运动估计范围
+    bool weightedPred; // 加权预测
+    bool cabac;        // CABAC熵编码
     
     // 编码结果
     double encodingTime;
