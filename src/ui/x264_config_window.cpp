@@ -449,15 +449,21 @@ void X264ConfigWindow::updateProgress(int frame, double encodingTime, double fps
     auto now = std::chrono::steady_clock::now();
     
     // 限制更新频率，每200ms更新一次
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdateTime).count() < 200) {
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdateTime).count() < 200
+        && frame != frameCountSpinBox_->value()) {  // 但在最后一帧时要立即更新
         return;
     }
     
     lastUpdateTime = now;
     lastUpdateFrame = frame;
     
-    // 更新进度条
-    int progress = static_cast<int>(frame * 100.0 / frameCountSpinBox_->value());
+    // 更新进度条，确保最后一帧时显示100%
+    int progress;
+    if (frame >= frameCountSpinBox_->value()) {
+        progress = 100;
+    } else {
+        progress = static_cast<int>(frame * 100.0 / frameCountSpinBox_->value());
+    }
     progressBar_->setValue(progress);
     
     // 只在整数百分比变化时更新状态
@@ -478,9 +484,9 @@ void X264ConfigWindow::updateProgress(int frame, double encodingTime, double fps
             status += QString(" | SSIM: %1").arg(ssim, 0, 'f', 3);
         }
         
-        // 只在整5%的进度时更新日志
-        if (progress % 5 == 0) {
-            appendLog(status);
+        // 只在整5%的进度时更新日志，或在100%时
+        if (progress % 5 == 0 || progress == 100) {
+            appendLog(status + "\n");
         }
     }
 }
@@ -505,6 +511,9 @@ void X264ConfigWindow::appendLog(const QString& text)
 
 void X264ConfigWindow::onEncodingFinished()
 {
+    // 确保进度条显示100%
+    progressBar_->setValue(100);
+    
     startButton_->setEnabled(true);
     stopButton_->setEnabled(false);
     playButton_->setEnabled(!currentOutputFile_.isEmpty());
