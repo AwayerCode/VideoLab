@@ -5,6 +5,8 @@
 #include <QGroupBox>
 #include <QMessageBox>
 #include <QApplication>
+#include <thread>
+#include <chrono>
 
 X264ConfigWindow::X264ConfigWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -145,25 +147,33 @@ void X264ConfigWindow::setupUI()
         tr("存档场景")
     });
     
+    auto* buttonLayout = new QHBoxLayout();
     startButton_ = new QPushButton(tr("开始编码"), this);
+    stopButton_ = new QPushButton(tr("停止编码"), this);
+    stopButton_->setEnabled(false);
+    buttonLayout->addWidget(startButton_);
+    buttonLayout->addWidget(stopButton_);
+    
     progressBar_ = new QProgressBar(this);
     logTextEdit_ = new QTextEdit(this);
     logTextEdit_->setReadOnly(true);
     
     rightLayout->addWidget(new QLabel(tr("预设场景:")));
     rightLayout->addWidget(sceneConfigCombo_);
-    rightLayout->addWidget(startButton_);
+    rightLayout->addLayout(buttonLayout);
     rightLayout->addWidget(progressBar_);
     rightLayout->addWidget(logTextEdit_);
     
     // 设置窗口属性
     setWindowTitle(tr("X264编码器配置"));
-    setMinimumSize(800, 600);
+    setFixedSize(800, 600);  // 固定窗口大小
+    setWindowFlags(windowFlags() & ~Qt::WindowMaximizeButtonHint);  // 禁用最大化按钮
 }
 
 void X264ConfigWindow::createConnections()
 {
     connect(startButton_, &QPushButton::clicked, this, &X264ConfigWindow::onStartEncoding);
+    connect(stopButton_, &QPushButton::clicked, this, &X264ConfigWindow::onStopEncoding);
     connect(rateControlCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &X264ConfigWindow::onRateControlChanged);
     connect(sceneConfigCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -172,34 +182,87 @@ void X264ConfigWindow::createConnections()
 
 void X264ConfigWindow::onStartEncoding()
 {
+    if (shouldStop_) {
+        return;
+    }
+
     auto config = getConfigFromUI();
     startButton_->setEnabled(false);
+    stopButton_->setEnabled(true);
     progressBar_->setValue(0);
     logTextEdit_->clear();
     
-    // 直接运行测试
-    X264ParamTest::runTest(config,
-        [this](int frame, const X264ParamTest::TestResult& result) {
-            // 更新进度
-            int progress = (frame * 100) / frameCountSpinBox_->value();
-            progressBar_->setValue(progress);
-            
-            // 更新日志
-            QString log = QString("Frame: %1\n编码时间: %.2f秒\n编码速度: %.2f fps\n"
-                                "码率: %.2f kbps\nPSNR: %.2f\nSSIM: %.2f\n")
-                            .arg(frame)
-                            .arg(result.encodingTime)
-                            .arg(result.fps)
-                            .arg(result.bitrate / 1000.0)
-                            .arg(result.psnr)
-                            .arg(result.ssim);
-            logTextEdit_->append(log);
-            
-            // 处理Qt事件，保持UI响应
-            QApplication::processEvents();
-        });
+    shouldStop_ = false;
     
+    // 在新线程中运行编码测试
+    std::thread encodingThread([this, config]() {
+        X264ParamTest::runTest(config,
+            [this](int frame, const X264ParamTest::TestResult& result) {
+                if (shouldStop_) {
+                    return false; // 返回false表示停止编码
+                }
+
+                // 通过信号槽更新UI
+                QMetaObject::invokeMethod(this, "updateProgress",
+                    Qt::QueuedConnection,
+                    Q_ARG(int, frame),
+                    Q_ARG(double, result.encodingTime),
+                    Q_ARG(double, result.fps),
+                    Q_ARG(double, result.bitrate),
+                    Q_ARG(double, result.psnr),
+                    Q_ARG(double, result.ssim));
+                
+                return true; // 返回true继续编码
+            });
+        
+        // 编码完成后，在主线程中更新UI
+        QMetaObject::invokeMethod(this, "onEncodingFinished", Qt::QueuedConnection);
+    });
+    encodingThread.detach();
+}
+
+void X264ConfigWindow::updateProgress(int frame, double time, double fps, double bitrate, double psnr, double ssim)
+{
+    // 更新进度
+    int progress = (frame * 100) / frameCountSpinBox_->value();
+    progressBar_->setValue(progress);
+    
+    // 每秒最多更新5次日志
+    static auto lastUpdate = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() >= 200) {
+        // 更新日志
+        QString log = QString("Frame: %1\n编码时间: %2秒\n编码速度: %3 fps\n"
+                            "码率: %4 kbps\nPSNR: %5\nSSIM: %6\n")
+                        .arg(frame)
+                        .arg(time, 0, 'f', 2)
+                        .arg(fps, 0, 'f', 2)
+                        .arg(bitrate / 1000.0, 0, 'f', 2)
+                        .arg(psnr, 0, 'f', 2)
+                        .arg(ssim, 0, 'f', 3);
+        logTextEdit_->append(log);
+        lastUpdate = now;
+    }
+}
+
+void X264ConfigWindow::appendLog(const QString& text)
+{
+    logTextEdit_->append(text);
+}
+
+void X264ConfigWindow::onEncodingFinished()
+{
     startButton_->setEnabled(true);
+    stopButton_->setEnabled(false);
+    shouldStop_ = false;
+}
+
+void X264ConfigWindow::onStopEncoding()
+{
+    shouldStop_ = true;
+    QMetaObject::invokeMethod(this, "appendLog",
+        Qt::QueuedConnection,
+        Q_ARG(QString, tr("\n已请求停止编码...\n")));
 }
 
 void X264ConfigWindow::onRateControlChanged(int index)

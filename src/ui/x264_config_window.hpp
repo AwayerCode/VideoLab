@@ -19,8 +19,12 @@ public:
 
 private slots:
     void onStartEncoding();
+    void onStopEncoding();
     void onRateControlChanged(int index);
     void onPresetConfigSelected(int index);
+    void updateProgress(int frame, double time, double fps, double bitrate, double psnr, double ssim);
+    void appendLog(const QString& text);
+    void onEncodingFinished();
 
 private:
     // 基本参数控件
@@ -57,10 +61,14 @@ private:
     
     // 控制按钮
     QPushButton* startButton_;
+    QPushButton* stopButton_;
     
     // 状态显示
     QProgressBar* progressBar_;
     QTextEdit* logTextEdit_;
+
+    // 编码控制
+    bool shouldStop_{false};
 
     void setupUI();
     void createConnections();

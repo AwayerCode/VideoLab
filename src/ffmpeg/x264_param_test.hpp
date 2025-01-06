@@ -229,8 +229,10 @@ private:
     
     // 性能测试相关
     std::chrono::steady_clock::time_point startTime_;
+    std::chrono::steady_clock::time_point frameStartTime_;
     int frameCount_{0};
     double encodingTime_{0.0};
+    double frameTime_{0.0};
     double fps_{0.0};
     double bitrate_{0.0};
     double psnr_{0.0};

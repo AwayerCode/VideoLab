@@ -142,6 +142,8 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
         return false;
     }
 
+    frameStartTime_ = std::chrono::steady_clock::now();  // 记录帧开始时间
+
     // 复制输入数据到帧
     av_frame_make_writable(frame_);
     for (int i = 0; i < frame_->height; i++) {
@@ -185,7 +187,8 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
     }
 
     auto now = std::chrono::steady_clock::now();
-    encodingTime_ = std::chrono::duration<double>(now - startTime_).count();
+    frameTime_ = std::chrono::duration<double>(now - frameStartTime_).count();  // 计算当前帧编码时间
+    encodingTime_ = std::chrono::duration<double>(now - startTime_).count();  // 更新总编码时间
     fps_ = frameCount_ / encodingTime_;
 
     return true;
@@ -235,11 +238,14 @@ X264ParamTest::TestResult X264ParamTest::runTest(
             return result;
         }
 
-        if (progressCallback && (i % 30 == 0 || i == config.frameCount - 1)) {
+        if (progressCallback) {
             TestResult current;
+            current.encodingTime = test.frameTime_;  // 使用帧编码时间
             current.fps = test.getFPS();
             current.bitrate = test.getBitrate();
-            progressCallback((i + 1) * 100 / config.frameCount, current);
+            current.psnr = test.getPSNR();
+            current.ssim = test.getSSIM();
+            progressCallback(i, current);
         }
     }
 
