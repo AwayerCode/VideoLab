@@ -243,6 +243,20 @@ private:
     double psnr_{0.0};
     double ssim_{0.0};
 
+    // 性能监控
+    struct PerformanceMetrics {
+        double totalEncodingTime{0.0};    // 总编码时间
+        double totalWritingTime{0.0};     // 总写入时间
+        double totalFrameGenTime{0.0};    // 总帧生成时间
+        int totalFrames{0};               // 总帧数
+        double avgEncodingTimePerFrame{0.0}; // 平均每帧编码时间
+        double avgWritingTimePerFrame{0.0};  // 平均每帧写入时间
+        double avgFrameGenTimePerFrame{0.0}; // 平均每帧生成时间
+        double maxEncodingTimePerFrame{0.0}; // 最大单帧编码时间
+        double maxWritingTimePerFrame{0.0};  // 最大单帧写入时间
+        double maxFrameGenTimePerFrame{0.0}; // 最大单帧生成时间
+    } perfMetrics_;
+
     // 将预设枚举转换为字符串
     static const char* presetToString(Preset preset);
     // 将调优模式枚举转换为字符串

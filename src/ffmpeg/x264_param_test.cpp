@@ -199,7 +199,8 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
         return false;
     }
 
-    frameStartTime_ = std::chrono::steady_clock::now();
+    auto frameStart = std::chrono::steady_clock::now();
+    frameStartTime_ = frameStart;
 
     // 如果data为空，表示刷新编码器
     if (!data) {
@@ -233,6 +234,7 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
         frame_->pts = frameCount_++;
 
         // 发送帧进行编码
+        auto encodeStart = std::chrono::steady_clock::now();
         int ret = avcodec_send_frame(encoderCtx_, frame_);
         if (ret < 0) {
             return false;
@@ -241,6 +243,10 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
 
     // 接收编码后的包
     bool gotPacket = false;
+    auto encodeStart = std::chrono::steady_clock::now();
+    double frameEncodeTime = 0.0;
+    double frameWriteTime = 0.0;
+
     while (true) {
         int ret = avcodec_receive_packet(encoderCtx_, packet_);
         if (ret == AVERROR(EAGAIN)) {
@@ -255,17 +261,37 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
         }
 
         gotPacket = true;
+        auto encodeEnd = std::chrono::steady_clock::now();
+        frameEncodeTime = std::chrono::duration<double>(encodeEnd - encodeStart).count();
+
         bitrate_ = (bitrate_ * (frameCount_ - 1) + packet_->size * 8.0 * encoderCtx_->time_base.den / encoderCtx_->time_base.num) / frameCount_;
 
         // 如果有输出文件，写入数据包
         if (formatCtx_) {
+            auto writeStart = std::chrono::steady_clock::now();
+            
             // 转换时间戳
             av_packet_rescale_ts(packet_, encoderCtx_->time_base, stream_->time_base);
             ret = av_interleaved_write_frame(formatCtx_, packet_);
+            
+            auto writeEnd = std::chrono::steady_clock::now();
+            frameWriteTime = std::chrono::duration<double>(writeEnd - writeStart).count();
+
             if (ret < 0) {
                 return false;
             }
         }
+
+        // 更新性能指标
+        perfMetrics_.totalEncodingTime += frameEncodeTime;
+        perfMetrics_.totalWritingTime += frameWriteTime;
+        perfMetrics_.totalFrames++;
+        
+        perfMetrics_.avgEncodingTimePerFrame = perfMetrics_.totalEncodingTime / perfMetrics_.totalFrames;
+        perfMetrics_.avgWritingTimePerFrame = perfMetrics_.totalWritingTime / perfMetrics_.totalFrames;
+        
+        perfMetrics_.maxEncodingTimePerFrame = std::max(perfMetrics_.maxEncodingTimePerFrame, frameEncodeTime);
+        perfMetrics_.maxWritingTimePerFrame = std::max(perfMetrics_.maxWritingTimePerFrame, frameWriteTime);
 
         av_packet_unref(packet_);
     }
@@ -274,6 +300,21 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
     frameTime_ = std::chrono::duration<double>(now - frameStartTime_).count();
     encodingTime_ = std::chrono::duration<double>(now - startTime_).count();
     fps_ = frameCount_ / encodingTime_;
+
+    // 每100帧输出一次性能统计
+    if (frameCount_ % 100 == 0) {
+        std::cout << "\n性能统计 (帧 " << frameCount_ << "):" << std::endl;
+        std::cout << "平均编码时间/帧: " << std::fixed << std::setprecision(3) 
+                  << perfMetrics_.avgEncodingTimePerFrame * 1000 << " ms" << std::endl;
+        std::cout << "平均写入时间/帧: " << std::fixed << std::setprecision(3) 
+                  << perfMetrics_.avgWritingTimePerFrame * 1000 << " ms" << std::endl;
+        std::cout << "最大编码时间/帧: " << std::fixed << std::setprecision(3) 
+                  << perfMetrics_.maxEncodingTimePerFrame * 1000 << " ms" << std::endl;
+        std::cout << "最大写入时间/帧: " << std::fixed << std::setprecision(3) 
+                  << perfMetrics_.maxWritingTimePerFrame * 1000 << " ms" << std::endl;
+        std::cout << "当前编码速度: " << std::fixed << std::setprecision(1) 
+                  << fps_ << " fps" << std::endl;
+    }
 
     return true;
 }
@@ -320,6 +361,8 @@ X264ParamTest::TestResult X264ParamTest::runTest(
     
     // 编码所有帧
     for (int i = 0; i < config.frameCount; i++) {
+        auto frameGenStart = std::chrono::steady_clock::now();
+        
         // 生成Y平面（亮度）- 创建一个动态的图案
         for (int y = 0; y < config.height; y++) {
             for (int x = 0; x < config.width; x++) {
@@ -384,6 +427,15 @@ X264ParamTest::TestResult X264ParamTest::runTest(
             }
         }
 
+        auto frameGenEnd = std::chrono::steady_clock::now();
+        double frameGenTime = std::chrono::duration<double>(frameGenEnd - frameGenStart).count();
+        
+        // 更新帧生成性能指标
+        test.perfMetrics_.totalFrameGenTime += frameGenTime;
+        test.perfMetrics_.avgFrameGenTimePerFrame = test.perfMetrics_.totalFrameGenTime / (i + 1);
+        test.perfMetrics_.maxFrameGenTimePerFrame = std::max(
+            test.perfMetrics_.maxFrameGenTimePerFrame, frameGenTime);
+
         if (!test.encodeFrame(testData.data(), testData.size())) {
             result.errorMessage = "编码帧失败";
             return result;
@@ -396,6 +448,15 @@ X264ParamTest::TestResult X264ParamTest::runTest(
             current.bitrate = test.getBitrate();
             current.psnr = test.getPSNR();
             current.ssim = test.getSSIM();
+            
+            // 添加性能指标到回调结果
+            std::stringstream perfInfo;
+            perfInfo << "\n帧生成时间: " << std::fixed << std::setprecision(3) 
+                    << test.perfMetrics_.avgFrameGenTimePerFrame * 1000 << " ms/帧"
+                    << "\n编码时间: " << test.perfMetrics_.avgEncodingTimePerFrame * 1000 << " ms/帧"
+                    << "\n写入时间: " << test.perfMetrics_.avgWritingTimePerFrame * 1000 << " ms/帧";
+            current.errorMessage = perfInfo.str();  // 使用errorMessage字段传递性能信息
+            
             progressCallback(i + 1, current);
         }
     }
