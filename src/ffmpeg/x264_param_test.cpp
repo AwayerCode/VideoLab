@@ -40,7 +40,7 @@ X264ParamTest::~X264ParamTest() {
     cleanup();
 }
 
-bool X264ParamTest::initEncoder(const TestConfig& config) {
+bool X264ParamTest::initEncoder(const TestConfig& config, const std::string& outputFile) {
     cleanup();
 
     // 查找编码器
@@ -53,28 +53,30 @@ bool X264ParamTest::initEncoder(const TestConfig& config) {
     // 创建编码器上下文
     encoderCtx_ = avcodec_alloc_context3(codec);
     if (!encoderCtx_) {
-        std::cerr << "无法创建编码器上下文" << std::endl;
+        std::cerr << "无法分配编码器上下文" << std::endl;
         return false;
     }
 
     // 设置基本参数
     encoderCtx_->width = config.width;
     encoderCtx_->height = config.height;
-    encoderCtx_->time_base = AVRational{1, config.fps};
-    encoderCtx_->framerate = AVRational{config.fps, 1};
+    encoderCtx_->time_base = AVRational{1, 25}; // 固定帧率为25fps
+    encoderCtx_->framerate = AVRational{25, 1};
     encoderCtx_->pix_fmt = AV_PIX_FMT_YUV420P;
     encoderCtx_->thread_count = config.threads;
-
-    // 设置x264特定参数
-    av_opt_set(encoderCtx_->priv_data, "preset", presetToString(config.preset), 0);
-    if (const char* tune = tuneToString(config.tune)) {
-        av_opt_set(encoderCtx_->priv_data, "tune", tune, 0);
-    }
+    encoderCtx_->codec_type = AVMEDIA_TYPE_VIDEO;
 
     // 设置码率控制
     switch (config.rateControl) {
         case RateControl::CRF:
             av_opt_set_int(encoderCtx_->priv_data, "crf", config.crf, 0);
+            break;
+        case RateControl::CQP:
+            encoderCtx_->global_quality = config.qp * FF_QP2LAMBDA;
+            encoderCtx_->flags |= AV_CODEC_FLAG_QSCALE;
+            break;
+        case RateControl::ABR:
+            encoderCtx_->bit_rate = config.bitrate;
             break;
         case RateControl::CBR:
             encoderCtx_->bit_rate = config.bitrate;
@@ -82,13 +84,16 @@ bool X264ParamTest::initEncoder(const TestConfig& config) {
             encoderCtx_->rc_min_rate = config.bitrate;
             encoderCtx_->rc_buffer_size = config.bitrate / 2;
             break;
-        case RateControl::ABR:
-            encoderCtx_->bit_rate = config.bitrate;
-            break;
-        case RateControl::CQP:
-            encoderCtx_->global_quality = config.qp * FF_QP2LAMBDA;
-            encoderCtx_->flags |= AV_CODEC_FLAG_QSCALE;
-            break;
+    }
+
+    // 设置预设和调优
+    if (av_opt_set(encoderCtx_->priv_data, "preset", presetToString(config.preset), 0) < 0) {
+        std::cerr << "设置预设失败" << std::endl;
+    }
+    if (config.tune != Tune::None) {
+        if (av_opt_set(encoderCtx_->priv_data, "tune", tuneToString(config.tune), 0) < 0) {
+            std::cerr << "设置调优失败" << std::endl;
+        }
     }
 
     // 设置GOP参数
@@ -97,10 +102,12 @@ bool X264ParamTest::initEncoder(const TestConfig& config) {
     encoderCtx_->refs = config.refs;
 
     // 设置其他质量参数
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%d", config.meRange);
-    av_opt_set(encoderCtx_->priv_data, "me_range", buf, 0);
-    av_opt_set(encoderCtx_->priv_data, "weightp", config.weightedPred ? "1" : "0", 0);
+    if (av_opt_set_int(encoderCtx_->priv_data, "me_range", config.meRange, 0) < 0) {
+        std::cerr << "设置me_range失败" << std::endl;
+    }
+    if (av_opt_set_int(encoderCtx_->priv_data, "weightp", config.weightedPred ? 1 : 0, 0) < 0) {
+        std::cerr << "设置weightp失败" << std::endl;
+    }
     if (!config.cabac) {
         encoderCtx_->flags &= ~AV_CODEC_FLAG_LOOP_FILTER;
     }
@@ -112,6 +119,47 @@ bool X264ParamTest::initEncoder(const TestConfig& config) {
         av_strerror(ret, errbuf, sizeof(errbuf));
         std::cerr << "无法打开编码器: " << errbuf << std::endl;
         return false;
+    }
+
+    // 如果指定了输出文件，创建输出上下文
+    if (!outputFile.empty()) {
+        formatCtx_ = avformat_alloc_context();
+        if (!formatCtx_) {
+            std::cerr << "无法分配格式上下文" << std::endl;
+            return false;
+        }
+
+        // 根据文件名推断格式
+        formatCtx_->oformat = av_guess_format(nullptr, outputFile.c_str(), nullptr);
+        if (!formatCtx_->oformat) {
+            std::cerr << "无法推断输出格式" << std::endl;
+            return false;
+        }
+
+        // 打开输出文件
+        if (avio_open(&formatCtx_->pb, outputFile.c_str(), AVIO_FLAG_WRITE) < 0) {
+            std::cerr << "无法打开输出文件: " << outputFile << std::endl;
+            return false;
+        }
+
+        // 创建视频流
+        stream_ = avformat_new_stream(formatCtx_, codec);
+        if (!stream_) {
+            std::cerr << "无法创建视频流" << std::endl;
+            return false;
+        }
+
+        // 复制编码器参数到流
+        if (avcodec_parameters_from_context(stream_->codecpar, encoderCtx_) < 0) {
+            std::cerr << "无法复制编码器参数到流" << std::endl;
+            return false;
+        }
+
+        // 写入文件头
+        if (avformat_write_header(formatCtx_, nullptr) < 0) {
+            std::cerr << "无法写入文件头" << std::endl;
+            return false;
+        }
     }
 
     // 分配帧和包
@@ -128,7 +176,9 @@ bool X264ParamTest::initEncoder(const TestConfig& config) {
 
     ret = av_frame_get_buffer(frame_, 0);
     if (ret < 0) {
-        std::cerr << "无法分配帧缓冲区" << std::endl;
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        std::cerr << "无法分配帧缓冲区: " << errbuf << std::endl;
         return false;
     }
 
@@ -142,59 +192,93 @@ bool X264ParamTest::encodeFrame(const uint8_t* data, int size) {
         return false;
     }
 
-    frameStartTime_ = std::chrono::steady_clock::now();  // 记录帧开始时间
+    frameStartTime_ = std::chrono::steady_clock::now();
 
-    // 复制输入数据到帧
-    av_frame_make_writable(frame_);
-    for (int i = 0; i < frame_->height; i++) {
-        memcpy(frame_->data[0] + i * frame_->linesize[0],
-               data + i * frame_->width,
-               frame_->width);
+    // 如果data为空，表示刷新编码器
+    if (!data) {
+        int ret = avcodec_send_frame(encoderCtx_, nullptr);
+        if (ret < 0) {
+            return false;
+        }
+    } else {
+        // 复制输入数据到帧
+        av_frame_make_writable(frame_);
+        for (int i = 0; i < frame_->height; i++) {
+            memcpy(frame_->data[0] + i * frame_->linesize[0],
+                   data + i * frame_->width,
+                   frame_->width);
+        }
+        // 复制U和V平面（假设YUV420P格式）
+        int uvHeight = frame_->height / 2;
+        int uvWidth = frame_->width / 2;
+        uint8_t* uData = const_cast<uint8_t*>(data + frame_->width * frame_->height);
+        uint8_t* vData = const_cast<uint8_t*>(uData + uvWidth * uvHeight);
+
+        for (int i = 0; i < uvHeight; i++) {
+            memcpy(frame_->data[1] + i * frame_->linesize[1],
+                   uData + i * uvWidth,
+                   uvWidth);
+            memcpy(frame_->data[2] + i * frame_->linesize[2],
+                   vData + i * uvWidth,
+                   uvWidth);
+        }
+
+        frame_->pts = frameCount_++;
+
+        // 发送帧进行编码
+        int ret = avcodec_send_frame(encoderCtx_, frame_);
+        if (ret < 0) {
+            return false;
+        }
     }
-    // 复制U和V平面（假设YUV420P格式）
-    int uvHeight = frame_->height / 2;
-    int uvWidth = frame_->width / 2;
-    uint8_t* uData = const_cast<uint8_t*>(data + frame_->width * frame_->height);
-    uint8_t* vData = const_cast<uint8_t*>(uData + uvWidth * uvHeight);
 
-    for (int i = 0; i < uvHeight; i++) {
-        memcpy(frame_->data[1] + i * frame_->linesize[1],
-               uData + i * uvWidth,
-               uvWidth);
-        memcpy(frame_->data[2] + i * frame_->linesize[2],
-               vData + i * uvWidth,
-               uvWidth);
-    }
-
-    frame_->pts = frameCount_++;
-
-    // 编码帧
-    int ret = avcodec_send_frame(encoderCtx_, frame_);
-    if (ret < 0) {
-        return false;
-    }
-
-    while (ret >= 0) {
-        ret = avcodec_receive_packet(encoderCtx_, packet_);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-            break;
+    // 接收编码后的包
+    bool gotPacket = false;
+    while (true) {
+        int ret = avcodec_receive_packet(encoderCtx_, packet_);
+        if (ret == AVERROR(EAGAIN)) {
+            break;  // 需要更多输入
+        } else if (ret == AVERROR_EOF) {
+            if (!data) {  // 如果是在刷新阶段收到EOF，这是正常的
+                break;
+            }
+            return false;  // 在正常编码过程中收到EOF是错误的
         } else if (ret < 0) {
             return false;
         }
 
+        gotPacket = true;
         bitrate_ = (bitrate_ * (frameCount_ - 1) + packet_->size * 8.0 * encoderCtx_->time_base.den / encoderCtx_->time_base.num) / frameCount_;
+
+        // 如果有输出文件，写入数据包
+        if (formatCtx_) {
+            // 转换时间戳
+            av_packet_rescale_ts(packet_, encoderCtx_->time_base, stream_->time_base);
+            ret = av_interleaved_write_frame(formatCtx_, packet_);
+            if (ret < 0) {
+                return false;
+            }
+        }
+
         av_packet_unref(packet_);
     }
 
     auto now = std::chrono::steady_clock::now();
-    frameTime_ = std::chrono::duration<double>(now - frameStartTime_).count();  // 计算当前帧编码时间
-    encodingTime_ = std::chrono::duration<double>(now - startTime_).count();  // 更新总编码时间
+    frameTime_ = std::chrono::duration<double>(now - frameStartTime_).count();
+    encodingTime_ = std::chrono::duration<double>(now - startTime_).count();
     fps_ = frameCount_ / encodingTime_;
 
     return true;
 }
 
 void X264ParamTest::cleanup() {
+    if (formatCtx_) {
+        if (formatCtx_->pb) {
+            avio_closep(&formatCtx_->pb);
+        }
+        avformat_free_context(formatCtx_);
+        formatCtx_ = nullptr;
+    }
     if (encoderCtx_) {
         avcodec_free_context(&encoderCtx_);
     }
@@ -204,6 +288,7 @@ void X264ParamTest::cleanup() {
     if (packet_) {
         av_packet_free(&packet_);
     }
+    stream_ = nullptr;
 }
 
 X264ParamTest::TestResult X264ParamTest::runTest(
@@ -213,8 +298,12 @@ X264ParamTest::TestResult X264ParamTest::runTest(
     TestResult result;
     result.success = false;
 
+    // 创建输出文件名，使用绝对路径
+    std::string outputFile = std::string(getenv("HOME")) + "/output_" + 
+        std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".mp4";
+
     X264ParamTest test;
-    if (!test.initEncoder(config)) {
+    if (!test.initEncoder(config, outputFile)) {
         result.errorMessage = "初始化编码器失败";
         return result;
     }
@@ -240,13 +329,30 @@ X264ParamTest::TestResult X264ParamTest::runTest(
 
         if (progressCallback) {
             TestResult current;
-            current.encodingTime = test.frameTime_;  // 使用帧编码时间
+            current.encodingTime = test.frameTime_;
             current.fps = test.getFPS();
             current.bitrate = test.getBitrate();
             current.psnr = test.getPSNR();
             current.ssim = test.getSSIM();
-            progressCallback(i, current);
+            progressCallback(i + 1, current);
         }
+    }
+
+    // 编码完成后，刷新编码器缓冲区
+    if (!test.encodeFrame(nullptr, 0)) {
+        result.errorMessage = "刷新编码器失败";
+        return result;
+    }
+
+    // 写入文件尾并关闭文件
+    if (test.formatCtx_ && test.formatCtx_->pb) {
+        // 写入文件尾
+        if (av_write_trailer(test.formatCtx_) < 0) {
+            result.errorMessage = "写入文件尾失败";
+            return result;
+        }
+        // 关闭输出文件
+        avio_closep(&test.formatCtx_->pb);
     }
 
     result.success = true;
@@ -255,6 +361,7 @@ X264ParamTest::TestResult X264ParamTest::runTest(
     result.bitrate = test.getBitrate();
     result.psnr = test.getPSNR();
     result.ssim = test.getSSIM();
+    result.outputFile = outputFile;
 
     return result;
 }

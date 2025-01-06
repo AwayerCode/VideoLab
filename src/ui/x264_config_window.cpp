@@ -5,8 +5,11 @@
 #include <QGroupBox>
 #include <QMessageBox>
 #include <QApplication>
+#include <QTime>
 #include <thread>
 #include <chrono>
+#include <QVideoWidget>
+#include <QMediaPlayer>
 
 X264ConfigWindow::X264ConfigWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -164,6 +167,35 @@ void X264ConfigWindow::setupUI()
     rightLayout->addWidget(progressBar_);
     rightLayout->addWidget(logTextEdit_);
     
+    // 视频播放区域
+    videoWidget_ = new QVideoWidget(this);
+    videoWidget_->setMinimumSize(480, 270);  // 16:9 比例
+    rightLayout->addWidget(videoWidget_);
+    
+    mediaPlayer_ = new QMediaPlayer(this);
+    mediaPlayer_->setVideoOutput(videoWidget_);
+    
+    // 播放控制
+    auto* playControlLayout = new QVBoxLayout();
+    
+    // 进度条和时间标签
+    auto* sliderLayout = new QHBoxLayout();
+    videoSlider_ = new QSlider(Qt::Horizontal, this);
+    videoSlider_->setEnabled(false);
+    timeLabel_ = new QLabel("00:00 / 00:00", this);
+    sliderLayout->addWidget(videoSlider_);
+    sliderLayout->addWidget(timeLabel_);
+    playControlLayout->addLayout(sliderLayout);
+    
+    // 播放按钮
+    auto* playButtonLayout = new QHBoxLayout();
+    playButton_ = new QPushButton(tr("播放"), this);
+    playButton_->setEnabled(false);
+    playButtonLayout->addWidget(playButton_);
+    playControlLayout->addLayout(playButtonLayout);
+    
+    rightLayout->addLayout(playControlLayout);
+    
     // 设置窗口属性
     setWindowTitle(tr("X264编码器配置"));
     setFixedSize(800, 600);  // 固定窗口大小
@@ -178,6 +210,12 @@ void X264ConfigWindow::createConnections()
             this, &X264ConfigWindow::onRateControlChanged);
     connect(sceneConfigCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &X264ConfigWindow::onPresetConfigSelected);
+    connect(playButton_, &QPushButton::clicked, this, &X264ConfigWindow::onPlayVideo);
+    
+    // 添加媒体播放相关的连接
+    connect(mediaPlayer_, &QMediaPlayer::positionChanged, this, &X264ConfigWindow::onMediaPositionChanged);
+    connect(mediaPlayer_, &QMediaPlayer::durationChanged, this, &X264ConfigWindow::onMediaDurationChanged);
+    connect(videoSlider_, &QSlider::sliderMoved, this, &X264ConfigWindow::onSliderMoved);
 }
 
 void X264ConfigWindow::onStartEncoding()
@@ -189,6 +227,7 @@ void X264ConfigWindow::onStartEncoding()
     auto config = getConfigFromUI();
     startButton_->setEnabled(false);
     stopButton_->setEnabled(true);
+    playButton_->setEnabled(false);
     progressBar_->setValue(0);
     logTextEdit_->clear();
     
@@ -196,10 +235,10 @@ void X264ConfigWindow::onStartEncoding()
     
     // 在新线程中运行编码测试
     std::thread encodingThread([this, config]() {
-        X264ParamTest::runTest(config,
+        auto result = X264ParamTest::runTest(config,
             [this](int frame, const X264ParamTest::TestResult& result) {
                 if (shouldStop_) {
-                    return false; // 返回false表示停止编码
+                    return false;
                 }
 
                 // 通过信号槽更新UI
@@ -212,11 +251,33 @@ void X264ConfigWindow::onStartEncoding()
                     Q_ARG(double, result.psnr),
                     Q_ARG(double, result.ssim));
                 
-                return true; // 返回true继续编码
+                return !shouldStop_; // 返回false表示停止编码
             });
         
         // 编码完成后，在主线程中更新UI
-        QMetaObject::invokeMethod(this, "onEncodingFinished", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [this, result]() {
+            if (result.success) {
+                currentOutputFile_ = QString::fromStdString(result.outputFile);
+                QString summary = QString(
+                    "\n编码完成！\n"
+                    "总编码时间: %1 秒\n"
+                    "平均编码速度: %2 fps\n"
+                    "平均码率: %3 kbps\n"
+                    "PSNR: %4\n"
+                    "SSIM: %5\n"
+                    "输出文件：%6\n")
+                    .arg(result.encodingTime, 0, 'f', 2)
+                    .arg(result.fps, 0, 'f', 2)
+                    .arg(result.bitrate / 1000.0, 0, 'f', 2)
+                    .arg(result.psnr, 0, 'f', 2)
+                    .arg(result.ssim, 0, 'f', 3)
+                    .arg(currentOutputFile_);
+                appendLog(summary);
+            } else {
+                appendLog(tr("\n编码失败：%1\n").arg(QString::fromStdString(result.errorMessage)));
+            }
+            onEncodingFinished();
+        }, Qt::QueuedConnection);
     });
     encodingThread.detach();
 }
@@ -242,6 +303,9 @@ void X264ConfigWindow::updateProgress(int frame, double time, double fps, double
                         .arg(ssim, 0, 'f', 3);
         logTextEdit_->append(log);
         lastUpdate = now;
+        
+        // 处理Qt事件，保持UI响应
+        QApplication::processEvents();
     }
 }
 
@@ -254,7 +318,11 @@ void X264ConfigWindow::onEncodingFinished()
 {
     startButton_->setEnabled(true);
     stopButton_->setEnabled(false);
+    playButton_->setEnabled(!currentOutputFile_.isEmpty());
     shouldStop_ = false;
+    
+    // 处理Qt事件，确保UI更新
+    QApplication::processEvents();
 }
 
 void X264ConfigWindow::onStopEncoding()
@@ -370,4 +438,45 @@ X264ParamTest::TestConfig X264ConfigWindow::getConfigFromUI() const
     config.cabac = cabacCheckBox_->isChecked();
     
     return config;
+}
+
+void X264ConfigWindow::onPlayVideo()
+{
+    if (currentOutputFile_.isEmpty()) {
+        QMessageBox::warning(this, tr("错误"), tr("没有可播放的视频文件"));
+        return;
+    }
+    
+    if (mediaPlayer_->playbackState() == QMediaPlayer::PlayingState) {
+        mediaPlayer_->pause();
+        playButton_->setText(tr("播放"));
+    } else {
+        mediaPlayer_->setSource(QUrl::fromLocalFile(currentOutputFile_));
+        mediaPlayer_->play();
+        playButton_->setText(tr("暂停"));
+    }
+}
+
+void X264ConfigWindow::onMediaPositionChanged(qint64 position)
+{
+    if (!videoSlider_->isSliderDown()) {
+        videoSlider_->setValue(position);
+    }
+    
+    // 更新时间标签
+    qint64 duration = mediaPlayer_->duration();
+    QString currentTime = QTime(0, 0).addMSecs(position).toString("mm:ss");
+    QString totalTime = QTime(0, 0).addMSecs(duration).toString("mm:ss");
+    timeLabel_->setText(QString("%1 / %2").arg(currentTime, totalTime));
+}
+
+void X264ConfigWindow::onMediaDurationChanged(qint64 duration)
+{
+    videoSlider_->setRange(0, duration);
+    videoSlider_->setEnabled(true);
+}
+
+void X264ConfigWindow::onSliderMoved(int position)
+{
+    mediaPlayer_->setPosition(position);
 } 

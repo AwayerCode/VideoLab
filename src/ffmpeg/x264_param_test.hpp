@@ -112,6 +112,7 @@ public:
         double ssim{0.0};          // 结构相似度
         bool success{false};
         std::string errorMessage;
+        std::string outputFile;     // 输出文件路径
 
         TestResult() = default;
     };
@@ -127,7 +128,7 @@ public:
     ~X264ParamTest();
 
     // 初始化编码器
-    bool initEncoder(const TestConfig& config);
+    bool initEncoder(const TestConfig& config, const std::string& outputFile = "");
     
     // 编码单帧
     bool encodeFrame(const uint8_t* data, int size);
@@ -226,6 +227,10 @@ private:
     AVCodecContext* encoderCtx_{nullptr};
     AVFrame* frame_{nullptr};
     AVPacket* packet_{nullptr};
+    
+    // 输出文件相关
+    AVFormatContext* formatCtx_{nullptr};
+    AVStream* stream_{nullptr};
     
     // 性能测试相关
     std::chrono::steady_clock::time_point startTime_;

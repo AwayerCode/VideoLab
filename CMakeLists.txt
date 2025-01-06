@@ -26,7 +26,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # 查找Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Multimedia MultimediaWidgets)
 # 确保Qt6的moc工具可用
 qt_standard_project_setup()
 
@@ -67,4 +67,7 @@ target_link_libraries(${PROJECT_NAME}
         Boost::context
         Qt6::Core
         Qt6::Widgets
+        Qt6::Gui
+        Qt6::Multimedia
+        Qt6::MultimediaWidgets
 ) 
