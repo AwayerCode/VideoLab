@@ -1,8 +1,15 @@
 #include "x264_param_test.hpp"
 #include <iostream>
 #include <iomanip>
-#include <random>
-#include <sstream>
+#include <chrono>
+#include <cmath>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/opt.h>
+#include <libavutil/imgutils.h>
+}
 
 const char* X264ParamTest::presetToString(Preset preset) {
     switch (preset) {
@@ -308,20 +315,75 @@ X264ParamTest::TestResult X264ParamTest::runTest(
         return result;
     }
 
-    // 生成测试数据（灰阶渐变）
+    // 生成测试数据（彩色渐变和动态图案）
     std::vector<uint8_t> testData(config.width * config.height * 3 / 2);  // YUV420P
-    for (int i = 0; i < config.height; i++) {
-        for (int j = 0; j < config.width; j++) {
-            testData[i * config.width + j] = (i + j) % 256;  // Y
-        }
-    }
-    // 填充U和V平面
-    int uvSize = config.width * config.height / 4;
-    std::fill_n(testData.begin() + config.width * config.height, uvSize, 128);      // U
-    std::fill_n(testData.begin() + config.width * config.height + uvSize, uvSize, 128);  // V
-
+    
     // 编码所有帧
     for (int i = 0; i < config.frameCount; i++) {
+        // 生成Y平面（亮度）- 创建一个动态的图案
+        for (int y = 0; y < config.height; y++) {
+            for (int x = 0; x < config.width; x++) {
+                // 创建动态图案
+                float time = i * 0.1f;  // 时间因子
+                
+                // 移动的条纹
+                int stripes = (
+                    ((y / 32 + i) % 2) * 128 +      // 水平移动条纹
+                    ((x / 32 + i) % 2) * 128        // 垂直移动条纹
+                ) / 2;
+                
+                // 扩散的圆形
+                int centerX = config.width / 2;
+                int centerY = config.height / 2;
+                int dx = x - centerX;
+                int dy = y - centerY;
+                float distance = sqrt(dx * dx + dy * dy);
+                float circle_radius = (100.0f + 50.0f * sin(time));  // 脉动的圆形
+                int circle = (distance < circle_radius) ? 255 : 0;
+                
+                // 旋转的图案
+                float angle = atan2(dy, dx);
+                float rotation = angle + time;
+                int spiral = static_cast<int>(128.0f + 127.0f * sin(rotation * 4.0f + distance * 0.02f));
+                
+                // 组合所有效果
+                testData[y * config.width + x] = static_cast<uint8_t>(
+                    (stripes + circle + spiral) / 3
+                );
+            }
+        }
+
+        // 生成U和V平面（色度）- 创建动态的彩色效果
+        int uvWidth = config.width / 2;
+        int uvHeight = config.height / 2;
+        uint8_t* uPlane = testData.data() + config.width * config.height;
+        uint8_t* vPlane = uPlane + uvWidth * uvHeight;
+
+        float time = i * 0.1f;  // 时间因子
+        for (int y = 0; y < uvHeight; y++) {
+            for (int x = 0; x < uvWidth; x++) {
+                // 创建动态的彩色渐变
+                float dx = (x - uvWidth/2) / float(uvWidth/2);
+                float dy = (y - uvHeight/2) / float(uvHeight/2);
+                float angle = atan2(dy, dx);
+                float dist = sqrt(dx * dx + dy * dy);
+                
+                // 旋转的色彩
+                float colorPhase = angle + time;
+                float distortion = sin(dist * 5.0f - time * 2.0f) * 0.5f;
+                
+                // U分量 - 动态蓝色分量
+                uPlane[y * uvWidth + x] = static_cast<uint8_t>(
+                    128 + 127 * sin(colorPhase + distortion)
+                );
+                
+                // V分量 - 动态红色分量
+                vPlane[y * uvWidth + x] = static_cast<uint8_t>(
+                    128 + 127 * cos(colorPhase - distortion)
+                );
+            }
+        }
+
         if (!test.encodeFrame(testData.data(), testData.size())) {
             result.errorMessage = "编码帧失败";
             return result;

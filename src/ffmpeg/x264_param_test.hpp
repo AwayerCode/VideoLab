@@ -89,7 +89,7 @@ public:
             , frameCount(300)
             , preset(Preset::Medium)
             , tune(Tune::None)
-            , threads(20)
+            , threads(1)
             , rateControl(RateControl::CRF)
             , crf(23)
             , fps(30)
