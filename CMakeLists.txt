@@ -42,6 +42,20 @@ set(SOURCES
     src/ui/x264_config_window.cpp
 )
 
+# 添加编译优化选项
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -fopenmp")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -fopenmp")
+endif()
+
+# 查找必要的包
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+    libavcodec
+    libavformat
+    libavutil
+)
+
 # 创建可执行文件
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -56,6 +70,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${FFMPEG_INCLUDE_DIRS}
 )
 
 # 链接库
@@ -70,4 +85,5 @@ target_link_libraries(${PROJECT_NAME}
         Qt6::Gui
         Qt6::Multimedia
         Qt6::MultimediaWidgets
+        PkgConfig::FFMPEG
 ) 

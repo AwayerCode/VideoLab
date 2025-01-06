@@ -12,6 +12,10 @@ extern "C" {
 #include <memory>
 #include <functional>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <atomic>
 
 class X264ParamTest {
 public:
@@ -222,6 +226,73 @@ public:
         int frameCount = 300
     );
 
+    // 写入缓冲相关
+    struct PacketData {
+        uint8_t* data;
+        int size;
+        int64_t pts;
+        int64_t dts;
+        int stream_index;
+        int flags;
+        int duration;
+    };
+
+    struct WriteBuffer {
+        static const size_t MAX_PACKETS = 300;  // 缓冲区最大包数量
+        std::vector<PacketData> packets;
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool finished{false};
+        std::thread writer_thread;
+        
+        WriteBuffer() : packets() {
+            packets.reserve(MAX_PACKETS);
+        }
+    } writeBuffer_;
+
+    // 写入线程相关
+    void startWriterThread();
+    void stopWriterThread();
+    void writerThreadFunc();
+    bool addPacketToBuffer(const AVPacket* packet);
+
+    // 帧缓存相关
+    struct FrameCache {
+        bool is_initialized{false};
+        bool use_disk_cache{false};
+        std::string cache_dir;
+        std::vector<std::vector<uint8_t>> frame_buffer;  // 内存中的帧缓存
+        size_t frame_size{0};  // 每帧的大小
+        size_t total_frames{0};  // 总帧数
+        
+        void clear() {
+            frame_buffer.clear();
+            is_initialized = false;
+        }
+    } frameCache_;
+
+    // 帧生成和缓存相关函数
+    bool initFrameCache(const TestConfig& config);
+    bool generateFrames(const TestConfig& config);
+    std::vector<uint8_t> generateSingleFrame(int width, int height, int frameIndex);
+    const uint8_t* getFrameData(size_t frameIndex) const;
+
+    // 帧生成相关
+    struct FrameGenerationStatus {
+        std::atomic<size_t> completed_frames{0};
+        std::atomic<bool> is_generating{false};
+        std::function<void(float)> progress_callback;
+    } gen_status_;
+
+    // 多线程帧生成
+    void generateFramesThreaded(const TestConfig& config, size_t thread_count);
+    static void frameGenerationWorker(
+        X264ParamTest* self,
+        const TestConfig& config,
+        size_t start_frame,
+        size_t end_frame
+    );
+
 private:
     // 编码器上下文
     AVCodecContext* encoderCtx_{nullptr};
@@ -248,13 +319,18 @@ private:
         double totalEncodingTime{0.0};    // 总编码时间
         double totalWritingTime{0.0};     // 总写入时间
         double totalFrameGenTime{0.0};    // 总帧生成时间
+        double totalFrameCopyTime{0.0};   // 总帧复制时间
+        double totalFrameTime{0.0};       // 总帧处理时间
         int totalFrames{0};               // 总帧数
         double avgEncodingTimePerFrame{0.0}; // 平均每帧编码时间
         double avgWritingTimePerFrame{0.0};  // 平均每帧写入时间
         double avgFrameGenTimePerFrame{0.0}; // 平均每帧生成时间
+        double avgFrameCopyTime{0.0};        // 平均每帧复制时间
+        double avgTotalTimePerFrame{0.0};    // 平均每帧总时间
         double maxEncodingTimePerFrame{0.0}; // 最大单帧编码时间
         double maxWritingTimePerFrame{0.0};  // 最大单帧写入时间
         double maxFrameGenTimePerFrame{0.0}; // 最大单帧生成时间
+        double maxFrameCopyTime{0.0};        // 最大单帧复制时间
     } perfMetrics_;
 
     // 将预设枚举转换为字符串

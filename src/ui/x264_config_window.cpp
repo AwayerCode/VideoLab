@@ -10,6 +10,7 @@
 #include <chrono>
 #include <QVideoWidget>
 #include <QMediaPlayer>
+#include <QTimer>
 
 X264ConfigWindow::X264ConfigWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -150,6 +151,25 @@ void X264ConfigWindow::setupUI()
         tr("存档场景")
     });
     
+    rightLayout->addWidget(new QLabel(tr("预设场景:")));
+    rightLayout->addWidget(sceneConfigCombo_);
+
+    // 帧生成状态
+    auto* frameGenLayout = new QHBoxLayout();
+    frameGenStatusLabel_ = new QLabel(tr("帧生成状态:"), this);
+    frameGenProgressBar_ = new QProgressBar(this);
+    frameGenProgressBar_->setRange(0, 100);
+    frameGenProgressBar_->setValue(0);
+    generateButton_ = new QPushButton(tr("重新生成"), this);
+    generateButton_->setEnabled(true);
+    
+    frameGenLayout->addWidget(frameGenStatusLabel_);
+    frameGenLayout->addWidget(frameGenProgressBar_, 1);
+    frameGenLayout->addWidget(generateButton_);
+    
+    rightLayout->addLayout(frameGenLayout);
+    
+    // 编码控制按钮
     auto* buttonLayout = new QHBoxLayout();
     startButton_ = new QPushButton(tr("开始编码"), this);
     stopButton_ = new QPushButton(tr("停止编码"), this);
@@ -157,13 +177,12 @@ void X264ConfigWindow::setupUI()
     buttonLayout->addWidget(startButton_);
     buttonLayout->addWidget(stopButton_);
     
+    rightLayout->addLayout(buttonLayout);
+    
     progressBar_ = new QProgressBar(this);
     logTextEdit_ = new QTextEdit(this);
     logTextEdit_->setReadOnly(true);
     
-    rightLayout->addWidget(new QLabel(tr("预设场景:")));
-    rightLayout->addWidget(sceneConfigCombo_);
-    rightLayout->addLayout(buttonLayout);
     rightLayout->addWidget(progressBar_);
     rightLayout->addWidget(logTextEdit_);
     
@@ -216,11 +235,23 @@ void X264ConfigWindow::createConnections()
     connect(mediaPlayer_, &QMediaPlayer::positionChanged, this, &X264ConfigWindow::onMediaPositionChanged);
     connect(mediaPlayer_, &QMediaPlayer::durationChanged, this, &X264ConfigWindow::onMediaDurationChanged);
     connect(videoSlider_, &QSlider::sliderMoved, this, &X264ConfigWindow::onSliderMoved);
+    
+    // 添加生成按钮的连接
+    connect(generateButton_, &QPushButton::clicked, this, &X264ConfigWindow::onGenerateFrames);
+    
+    // 在窗口显示后自动开始生成帧
+    QTimer::singleShot(0, this, &X264ConfigWindow::onGenerateFrames);
 }
 
 void X264ConfigWindow::onStartEncoding()
 {
     if (shouldStop_) {
+        return;
+    }
+
+    // 检查帧是否已生成
+    if (frameGenProgressBar_->value() != 100) {
+        QMessageBox::warning(this, tr("警告"), tr("请等待帧生成完成后再开始编码"));
         return;
     }
 
@@ -233,11 +264,24 @@ void X264ConfigWindow::onStartEncoding()
     
     shouldStop_ = false;
     
+    appendLog(tr("开始编码...\n"));
+    appendLog(tr("编码配置:\n"));
+    appendLog(tr("分辨率: %1x%2\n").arg(config.width).arg(config.height));
+    appendLog(tr("帧数: %1\n").arg(config.frameCount));
+    appendLog(tr("线程数: %1\n").arg(config.threads));
+    appendLog(tr("预设: %1\n").arg(presetCombo_->currentText()));
+    appendLog(tr("调优: %1\n").arg(tuneCombo_->currentText()));
+    appendLog(tr("码率控制: %1\n").arg(rateControlCombo_->currentText()));
+    appendLog(tr("正在启动编码线程...\n"));
+    
     // 在新线程中运行编码测试
     std::thread encodingThread([this, config]() {
+        appendLog(tr("正在初始化编码器...\n"));
+        
         auto result = X264ParamTest::runTest(config,
             [this](int frame, const X264ParamTest::TestResult& result) {
                 if (shouldStop_) {
+                    appendLog(tr("\n编码已停止\n"));
                     return false;
                 }
 
@@ -479,4 +523,59 @@ void X264ConfigWindow::onMediaDurationChanged(qint64 duration)
 void X264ConfigWindow::onSliderMoved(int position)
 {
     mediaPlayer_->setPosition(position);
+}
+
+void X264ConfigWindow::onGenerateFrames()
+{
+    generateButton_->setEnabled(false);
+    frameGenStatusLabel_->setText(tr("正在生成帧..."));
+    frameGenProgressBar_->setValue(0);
+    logTextEdit_->clear();
+    appendLog(tr("开始生成视频帧...\n"));
+
+    // 获取当前配置
+    auto config = getConfigFromUI();
+    appendLog(tr("配置信息:\n"));
+    appendLog(tr("分辨率: %1x%2\n").arg(config.width).arg(config.height));
+    appendLog(tr("帧数: %1\n").arg(config.frameCount));
+    appendLog(tr("线程数: %1\n").arg(config.threads));
+    
+    // 创建后台线程进行帧生成
+    std::thread([this, config]() {
+        X264ParamTest test;
+        test.gen_status_.progress_callback = [this](float progress) {
+            // 使用Qt的信号槽机制更新UI
+            QMetaObject::invokeMethod(this, [this, progress]() {
+                int percent = static_cast<int>(progress * 100);
+                frameGenProgressBar_->setValue(percent);
+                appendLog(tr("\r生成进度: %1%").arg(percent));
+                
+                // 每10%更新一次进度
+                if (percent % 10 == 0) {
+                    appendLog(tr("\n已生成 %1% 的帧\n").arg(percent));
+                }
+            }, Qt::QueuedConnection);
+        };
+
+        auto start_time = std::chrono::steady_clock::now();
+
+        if (test.initFrameCache(config)) {
+            auto end_time = std::chrono::steady_clock::now();
+            double duration = std::chrono::duration<double>(end_time - start_time).count();
+            
+            QMetaObject::invokeMethod(this, [this, duration]() {
+                frameGenStatusLabel_->setText(tr("帧生成完成"));
+                generateButton_->setEnabled(true);
+                appendLog(tr("\n帧生成完成!\n"));
+                appendLog(tr("总耗时: %1 秒\n").arg(duration, 0, 'f', 2));
+                appendLog(tr("平均速度: %1 帧/秒\n").arg(frameCountSpinBox_->value() / duration, 0, 'f', 1));
+            }, Qt::QueuedConnection);
+        } else {
+            QMetaObject::invokeMethod(this, [this]() {
+                frameGenStatusLabel_->setText(tr("帧生成失败"));
+                generateButton_->setEnabled(true);
+                appendLog(tr("\n帧生成失败!\n"));
+            }, Qt::QueuedConnection);
+        }
+    }).detach();
 } 

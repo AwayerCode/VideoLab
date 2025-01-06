@@ -32,6 +32,7 @@ private slots:
     void updateProgress(int frame, double time, double fps, double bitrate, double psnr, double ssim);
     void appendLog(const QString& text);
     void onEncodingFinished();
+    void onGenerateFrames();
 
 private:
     void setupUI();
@@ -85,4 +86,9 @@ private:
 
     // 当前输出文件
     QString currentOutputFile_;
+
+    // 帧生成控件
+    QProgressBar* frameGenProgressBar_{};
+    QPushButton* generateButton_{};
+    QLabel* frameGenStatusLabel_{};
 }; 
