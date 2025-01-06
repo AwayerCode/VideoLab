@@ -2,205 +2,203 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include <map>
-#include <functional>
+#include <iomanip>
 #include "ffmpeg/analyzer.hpp"
 #include "ffmpeg/x264_param_test.hpp"
 #include "ffmpeg/x265_param_test.hpp"
 
-// 命令处理函数类型
-using CommandHandler = std::function<void()>;
-
-// 命令帮助信息
-struct CommandHelp {
-    std::string description;
-    std::string usage;
-};
-
 // 全局变量
-std::map<std::string, std::pair<CommandHandler, CommandHelp>> commands;
-std::string input_file;
-std::string output_file;
-std::string encoder = "libx264";
-std::string filter_name;
-int bitrate = 2000;
-std::string test_type = "preset";
-std::string codec = "x264";
 int width = 1920;
 int height = 1080;
 int frame_count = 300;
+int fps = 30;
 
-// 字符串分割函数
-std::vector<std::string> split(const std::string& s, char delimiter = ' ') {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::istringstream tokenStream(s);
-    while (std::getline(tokenStream, token, delimiter)) {
-        if (!token.empty()) {
-            tokens.push_back(token);
-        }
+// 计算原始数据大小（以MB为单位）
+double calculateRawSize() {
+    // YUV420格式，每个像素1.5字节
+    double frame_size = width * height * 1.5;
+    double total_size = frame_size * frame_count;
+    return total_size / (1024 * 1024); // 转换为MB
+}
+
+// 显示主菜单
+void showMainMenu() {
+    std::cout << "\n=== 视频编码性能对比工具 v1.0.0 ===\n" << std::endl;
+    std::cout << "1. 预设性能对比测试" << std::endl;
+    std::cout << "2. 码率控制对比测试" << std::endl;
+    std::cout << "3. 修改测试参数" << std::endl;
+    std::cout << "0. 退出程序" << std::endl;
+    std::cout << "\n当前测试参数：" << std::endl;
+    std::cout << "分辨率: " << width << "x" << height << std::endl;
+    std::cout << "帧率: " << fps << " fps" << std::endl;
+    std::cout << "测试帧数: " << frame_count << std::endl;
+    std::cout << "原始数据大小: " << std::fixed << std::setprecision(2) << calculateRawSize() << " MB" << std::endl;
+    std::cout << "\n请选择: ";
+}
+
+// 修改测试参数
+void modifyTestParams() {
+    std::cout << "\n=== 修改测试参数 ===\n" << std::endl;
+    std::string input;
+
+    std::cout << "输入视频宽度 [" << width << "]: ";
+    std::getline(std::cin, input);
+    if (!input.empty()) width = std::stoi(input);
+
+    std::cout << "输入视频高度 [" << height << "]: ";
+    std::getline(std::cin, input);
+    if (!input.empty()) height = std::stoi(input);
+
+    std::cout << "输入帧率 [" << fps << "]: ";
+    std::getline(std::cin, input);
+    if (!input.empty()) fps = std::stoi(input);
+
+    std::cout << "输入测试帧数 [" << frame_count << "]: ";
+    std::getline(std::cin, input);
+    if (!input.empty()) frame_count = std::stoi(input);
+
+    double raw_size = calculateRawSize();
+    std::cout << "\n参数已更新！" << std::endl;
+    std::cout << "原始数据大小: " << std::fixed << std::setprecision(2) << raw_size << " MB" << std::endl;
+}
+
+// 计算编码后的数据大小（以MB为单位）
+double calculateEncodedSize(double bitrate, int duration_seconds) {
+    return (bitrate * duration_seconds) / (8 * 1024 * 1024); // 转换为MB
+}
+
+// 预设性能对比测试
+void runPresetComparisonTest() {
+    std::cout << "\n=== 开始预设性能对比测试 ===\n" << std::endl;
+    std::cout << "测试参数：" << std::endl;
+    std::cout << "分辨率: " << width << "x" << height << std::endl;
+    std::cout << "帧率: " << fps << " fps" << std::endl;
+    std::cout << "测试帧数: " << frame_count << std::endl;
+    double raw_size = calculateRawSize();
+    std::cout << "原始数据大小: " << std::fixed << std::setprecision(2) << raw_size << " MB" << std::endl;
+    std::cout << "\n----------------------------------------" << std::endl;
+
+    // x264测试
+    std::cout << "\n[x264测试]" << std::endl;
+    auto x264_results = X264ParamTest::runPresetTest(width, height, frame_count);
+
+    // x265测试
+    std::cout << "\n[x265测试]" << std::endl;
+    auto x265_results = X265ParamTest::runPresetTest(width, height, frame_count, fps);
+
+    // 显示对比结果
+    std::cout << "\n=== 性能对比结果 ===\n" << std::endl;
+    std::cout << std::setw(12) << "预设" 
+              << std::setw(15) << "x264 FPS"
+              << std::setw(15) << "x265 FPS"
+              << std::setw(15) << "x264大小(MB)"
+              << std::setw(15) << "x265大小(MB)"
+              << std::setw(12) << "速度比"
+              << std::setw(12) << "压缩比"
+              << std::endl;
+
+    const char* presets[] = {
+        "ultrafast", "superfast", "veryfast", "faster", "fast",
+        "medium", "slow", "slower", "veryslow"
+    };
+
+    double duration = static_cast<double>(frame_count) / fps;
+    for (size_t i = 0; i < x264_results.size() && i < x265_results.size(); ++i) {
+        double speed_ratio = x264_results[i].fps / x265_results[i].fps;
+        double x264_size = calculateEncodedSize(x264_results[i].bitrate, duration);
+        double x265_size = calculateEncodedSize(x265_results[i].bitrate, duration);
+        double compression_ratio = raw_size / x265_size; // 使用x265的压缩比
+
+        std::cout << std::setw(12) << presets[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << x264_results[i].fps
+                  << std::setw(15) << x265_results[i].fps
+                  << std::setw(15) << x264_size
+                  << std::setw(15) << x265_size
+                  << std::setw(12) << speed_ratio
+                  << std::setw(12) << compression_ratio
+                  << std::endl;
     }
-    return tokens;
 }
 
-// 显示帮助信息
-void showHelp() {
-    std::cout << "\n可用命令：" << std::endl;
-    for (const auto& cmd : commands) {
-        std::cout << cmd.first << " - " << cmd.second.second.description << std::endl;
-        std::cout << "  用法: " << cmd.second.second.usage << std::endl;
+// 码率控制对比测试
+void runRateControlComparisonTest() {
+    std::cout << "\n=== 开始码率控制对比测试 ===\n" << std::endl;
+    std::cout << "测试参数：" << std::endl;
+    std::cout << "分辨率: " << width << "x" << height << std::endl;
+    std::cout << "帧率: " << fps << " fps" << std::endl;
+    std::cout << "测试帧数: " << frame_count << std::endl;
+    double raw_size = calculateRawSize();
+    std::cout << "原始数据大小: " << std::fixed << std::setprecision(2) << raw_size << " MB" << std::endl;
+    std::cout << "\n----------------------------------------" << std::endl;
+
+    std::vector<int> crf_values = {18, 23, 28, 33};
+
+    // x264测试
+    std::cout << "\n[x264测试]" << std::endl;
+    auto x264_results = X264ParamTest::runRateControlTest(
+        X264ParamTest::RateControl::CRF,
+        crf_values,
+        width, height, frame_count
+    );
+
+    // x265测试
+    std::cout << "\n[x265测试]" << std::endl;
+    auto x265_results = X265ParamTest::runRateControlTest(
+        X265ParamTest::RateControl::CRF,
+        crf_values,
+        width, height, frame_count, fps
+    );
+
+    // 显示对比结果
+    std::cout << "\n=== 码率控制对比结果 ===\n" << std::endl;
+    std::cout << std::setw(8) << "CRF" 
+              << std::setw(15) << "x264 FPS"
+              << std::setw(15) << "x265 FPS"
+              << std::setw(15) << "x264大小(MB)"
+              << std::setw(15) << "x265大小(MB)"
+              << std::setw(12) << "速度比"
+              << std::setw(12) << "压缩比"
+              << std::endl;
+
+    double duration = static_cast<double>(frame_count) / fps;
+    for (size_t i = 0; i < x264_results.size() && i < x265_results.size(); ++i) {
+        double speed_ratio = x264_results[i].fps / x265_results[i].fps;
+        double x264_size = calculateEncodedSize(x264_results[i].bitrate, duration);
+        double x265_size = calculateEncodedSize(x265_results[i].bitrate, duration);
+        double compression_ratio = raw_size / x265_size; // 使用x265的压缩比
+
+        std::cout << std::setw(8) << crf_values[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << x264_results[i].fps
+                  << std::setw(15) << x265_results[i].fps
+                  << std::setw(15) << x264_size
+                  << std::setw(15) << x265_size
+                  << std::setw(12) << speed_ratio
+                  << std::setw(12) << compression_ratio
+                  << std::endl;
     }
-}
-
-// 分析视频文件
-void analyzeVideo() {
-    std::cout << "请输入视频文件路径: ";
-    std::getline(std::cin, input_file);
-
-    VideoAnalyzer analyzer;
-    if (!analyzer.analyze(input_file)) {
-        std::cerr << "无法打开文件: " << input_file << std::endl;
-        return;
-    }
-
-    std::cout << "\n=== 视频文件分析结果 ===\n\n"
-              << analyzer.getFormatInfo() << "\n"
-              << analyzer.getVideoInfo() << "\n"
-              << analyzer.getAudioInfo() << "\n"
-              << analyzer.getStreamInfo() << std::endl;
-}
-
-// 编码测试
-void testEncoder() {
-    std::cout << "选择编码器 (1: x264, 2: x265) [1]: ";
-    std::string choice;
-    std::getline(std::cin, choice);
-    codec = choice == "2" ? "x265" : "x264";
-
-    std::cout << "选择测试类型 (1: preset, 2: ratecontrol) [1]: ";
-    std::getline(std::cin, choice);
-    test_type = choice == "2" ? "ratecontrol" : "preset";
-
-    std::cout << "输入视频宽度 [1920]: ";
-    std::getline(std::cin, choice);
-    if (!choice.empty()) width = std::stoi(choice);
-
-    std::cout << "输入视频高度 [1080]: ";
-    std::getline(std::cin, choice);
-    if (!choice.empty()) height = std::stoi(choice);
-
-    std::cout << "输入测试帧数 [300]: ";
-    std::getline(std::cin, choice);
-    if (!choice.empty()) frame_count = std::stoi(choice);
-
-    if (codec == "x264") {
-        if (test_type == "preset") {
-            X264ParamTest::runPresetTest(width, height, frame_count);
-        } else {
-            std::vector<int> crf_values = {18, 23, 28, 33};
-            X264ParamTest::runRateControlTest(
-                X264ParamTest::RateControl::CRF,
-                crf_values,
-                width, height, frame_count
-            );
-        }
-    } else {
-        if (test_type == "preset") {
-            X265ParamTest::runPresetTest(width, height, frame_count);
-        } else {
-            std::vector<int> crf_values = {18, 23, 28, 33};
-            X265ParamTest::runRateControlTest(
-                X265ParamTest::RateControl::CRF,
-                crf_values,
-                width, height, frame_count
-            );
-        }
-    }
-}
-
-// 编码视频
-void encodeVideo() {
-    std::cout << "请输入源视频文件路径: ";
-    std::getline(std::cin, input_file);
-
-    std::cout << "请输入目标视频文件路径: ";
-    std::getline(std::cin, output_file);
-
-    std::cout << "选择编码器 (1: x264, 2: x265) [1]: ";
-    std::string choice;
-    std::getline(std::cin, choice);
-    encoder = choice == "2" ? "libx265" : "libx264";
-
-    std::cout << "输入目标码率(Kbps) [2000]: ";
-    std::getline(std::cin, choice);
-    if (!choice.empty()) bitrate = std::stoi(choice);
-
-    std::cout << "编码视频文件:" << std::endl
-              << "输入: " << input_file << std::endl
-              << "输出: " << output_file << std::endl
-              << "编码器: " << encoder << std::endl
-              << "比特率: " << bitrate << "Kbps" << std::endl;
-    // TODO: 实现视频编码功能
-}
-
-// 应用滤镜
-void applyFilter() {
-    std::cout << "请输入源视频文件路径: ";
-    std::getline(std::cin, input_file);
-
-    std::cout << "请输入目标视频文件路径: ";
-    std::getline(std::cin, output_file);
-
-    std::cout << "请输入滤镜名称: ";
-    std::getline(std::cin, filter_name);
-
-    std::cout << "应用视频滤镜:" << std::endl
-              << "输入: " << input_file << std::endl
-              << "输出: " << output_file << std::endl
-              << "滤镜: " << filter_name << std::endl;
-    // TODO: 实现视频滤镜功能
-}
-
-// 退出程序
-void quit() {
-    std::cout << "再见！" << std::endl;
-    exit(0);
 }
 
 int main() {
-    std::cout << "欢迎使用跨平台视频工具 v1.0.0" << std::endl;
-    std::cout << "输入 'help' 获取帮助信息" << std::endl;
-
-    // 注册命令
-    commands["help"] = {showHelp, {"显示帮助信息", "help"}};
-    commands["analyze"] = {analyzeVideo, {"分析视频文件", "analyze"}};
-    commands["encode"] = {encodeVideo, {"编码视频文件", "encode"}};
-    commands["filter"] = {applyFilter, {"应用视频滤镜", "filter"}};
-    commands["test"] = {testEncoder, {"编码器测试", "test"}};
-    commands["quit"] = {quit, {"退出程序", "quit"}};
-    commands["exit"] = {quit, {"退出程序", "exit"}};
-
-    // 主循环
-    std::string line;
+    std::string choice;
     while (true) {
-        std::cout << "\nvideo> ";
-        std::getline(std::cin, line);
+        showMainMenu();
+        std::getline(std::cin, choice);
 
-        // 跳过空行
-        if (line.empty()) {
-            continue;
+        if (choice == "1") {
+            runPresetComparisonTest();
         }
-
-        // 执行命令
-        auto it = commands.find(line);
-        if (it != commands.end()) {
-            try {
-                it->second.first();
-            } catch (const std::exception& e) {
-                std::cerr << "错误: " << e.what() << std::endl;
-            }
-        } else {
-            std::cout << "未知命令: " << line << "\n输入 'help' 获取帮助" << std::endl;
+        else if (choice == "2") {
+            runRateControlComparisonTest();
+        }
+        else if (choice == "3") {
+            modifyTestParams();
+        }
+        else if (choice == "0") {
+            std::cout << "再见！" << std::endl;
+            break;
+        }
+        else {
+            std::cout << "无效的选择，请重试" << std::endl;
         }
     }
 

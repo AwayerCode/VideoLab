@@ -57,6 +57,7 @@ public:
         Preset preset;
         Tune tune;
         int threads;
+        int fps;  // 添加fps参数
         
         // 码率控制参数
         RateControl rateControl;
@@ -82,6 +83,7 @@ public:
             , preset(Preset::Medium)
             , tune(Tune::None)
             , threads(0)
+            , fps(30)  // 设置默认帧率为30fps
             , rateControl(RateControl::CRF)
             , crf(28)
             , qp(23)
@@ -137,7 +139,8 @@ public:
     static std::vector<TestResult> runPresetTest(
         int width = 1920,
         int height = 1080,
-        int frameCount = 300
+        int frameCount = 300,
+        int fps = 30
     );
 
     // 运行码率控制测试
@@ -146,7 +149,8 @@ public:
         const std::vector<int>& values,
         int width = 1920,
         int height = 1080,
-        int frameCount = 300
+        int frameCount = 300,
+        int fps = 30
     );
 
 private:

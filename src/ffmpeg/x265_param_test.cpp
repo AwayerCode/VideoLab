@@ -58,8 +58,8 @@ bool X265ParamTest::initEncoder(const TestConfig& config) {
     // 设置基本参数
     encoderCtx_->width = config.width;
     encoderCtx_->height = config.height;
-    encoderCtx_->time_base = AVRational{1, 25};
-    encoderCtx_->framerate = AVRational{25, 1};
+    encoderCtx_->time_base = AVRational{1, config.fps};
+    encoderCtx_->framerate = AVRational{config.fps, 1};
     encoderCtx_->pix_fmt = AV_PIX_FMT_YUV420P;
     encoderCtx_->thread_count = config.threads;
 
@@ -253,7 +253,7 @@ X265ParamTest::TestResult X265ParamTest::runTest(
 }
 
 std::vector<X265ParamTest::TestResult> X265ParamTest::runPresetTest(
-    int width, int height, int frameCount
+    int width, int height, int frameCount, int fps
 ) {
     std::vector<TestResult> results;
     std::vector<Preset> presets = {
@@ -266,6 +266,7 @@ std::vector<X265ParamTest::TestResult> X265ParamTest::runPresetTest(
     std::cout << "测试参数：" << std::endl;
     std::cout << "分辨率: " << width << "x" << height << std::endl;
     std::cout << "帧数: " << frameCount << std::endl;
+    std::cout << "帧率: " << fps << " fps" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
 
     for (auto preset : presets) {
@@ -276,25 +277,19 @@ std::vector<X265ParamTest::TestResult> X265ParamTest::runPresetTest(
         config.height = height;
         config.frameCount = frameCount;
         config.preset = preset;
+        config.fps = fps;  // 使用传入的fps参数
 
-        auto result = runTest(config, [](int progress, const TestResult& current) {
-            std::cout << "\r已编码: " << std::setw(4) << progress << "%"
-                     << " | FPS: " << std::fixed << std::setprecision(2) << current.fps
-                     << " | 码率: " << std::setw(8) << static_cast<int>(current.bitrate / 1000) << " Kbps"
+        auto result = runTest(config, [](int frame, const TestResult& progress) {
+            std::cout << "\r已编码: " << std::setw(4) << frame << " 帧"
+                     << " | FPS: " << std::fixed << std::setprecision(2) << progress.fps
+                     << " | 码率: " << std::setw(8) << static_cast<int>(progress.bitrate / 1000) << " Kbps"
                      << std::flush;
         });
 
         if (result.success) {
-            std::cout << "\n结果:" << std::endl;
-            std::cout << "编码速度: " << result.fps << " fps" << std::endl;
-            std::cout << "平均码率: " << static_cast<int>(result.bitrate / 1000) << " Kbps" << std::endl;
-            if (result.psnr > 0) std::cout << "PSNR: " << result.psnr << " dB" << std::endl;
-            if (result.ssim > 0) std::cout << "SSIM: " << result.ssim << std::endl;
-        } else {
-            std::cout << "\n测试失败: " << result.errorMessage << std::endl;
+            results.push_back(result);
         }
-
-        results.push_back(result);
+        std::cout << std::endl;
     }
 
     return results;
@@ -303,53 +298,52 @@ std::vector<X265ParamTest::TestResult> X265ParamTest::runPresetTest(
 std::vector<X265ParamTest::TestResult> X265ParamTest::runRateControlTest(
     RateControl mode,
     const std::vector<int>& values,
-    int width, int height, int frameCount
+    int width, int height, int frameCount, int fps
 ) {
     std::vector<TestResult> results;
 
     std::cout << "\n开始x265码率控制测试...\n" << std::endl;
     std::cout << "测试参数：" << std::endl;
-    std::cout << "模式: " << (mode == RateControl::CRF ? "CRF" :
-                           mode == RateControl::CQP ? "CQP" :
-                           mode == RateControl::ABR ? "ABR" : "CBR") << std::endl;
     std::cout << "分辨率: " << width << "x" << height << std::endl;
     std::cout << "帧数: " << frameCount << std::endl;
+    std::cout << "帧率: " << fps << " fps" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
 
     for (int value : values) {
-        std::cout << "\n测试值: " << value << std::endl;
-        
         TestConfig config;
         config.width = width;
         config.height = height;
         config.frameCount = frameCount;
         config.rateControl = mode;
-        
+        config.fps = fps;  // 使用传入的fps参数
+
         switch (mode) {
-            case RateControl::CRF: config.crf = value; break;
-            case RateControl::CQP: config.qp = value; break;
+            case RateControl::CRF:
+                config.crf = value;
+                std::cout << "\n测试CRF: " << value << std::endl;
+                break;
+            case RateControl::CQP:
+                config.qp = value;
+                std::cout << "\n测试QP: " << value << std::endl;
+                break;
             case RateControl::ABR:
-            case RateControl::CBR: config.bitrate = value; break;
+            case RateControl::CBR:
+                config.bitrate = value;
+                std::cout << "\n测试码率: " << value << " kbps" << std::endl;
+                break;
         }
 
-        auto result = runTest(config, [](int progress, const TestResult& current) {
-            std::cout << "\r已编码: " << std::setw(4) << progress << "%"
-                     << " | FPS: " << std::fixed << std::setprecision(2) << current.fps
-                     << " | 码率: " << std::setw(8) << static_cast<int>(current.bitrate / 1000) << " Kbps"
+        auto result = runTest(config, [](int frame, const TestResult& progress) {
+            std::cout << "\r已编码: " << std::setw(4) << frame << " 帧"
+                     << " | FPS: " << std::fixed << std::setprecision(2) << progress.fps
+                     << " | 码率: " << std::setw(8) << static_cast<int>(progress.bitrate / 1000) << " Kbps"
                      << std::flush;
         });
 
         if (result.success) {
-            std::cout << "\n结果:" << std::endl;
-            std::cout << "编码速度: " << result.fps << " fps" << std::endl;
-            std::cout << "平均码率: " << static_cast<int>(result.bitrate / 1000) << " Kbps" << std::endl;
-            if (result.psnr > 0) std::cout << "PSNR: " << result.psnr << " dB" << std::endl;
-            if (result.ssim > 0) std::cout << "SSIM: " << result.ssim << std::endl;
-        } else {
-            std::cout << "\n测试失败: " << result.errorMessage << std::endl;
+            results.push_back(result);
         }
-
-        results.push_back(result);
+        std::cout << std::endl;
     }
 
     return results;
