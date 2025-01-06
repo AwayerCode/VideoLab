@@ -410,16 +410,11 @@ bool X264ParamTest::initFrameCache(const TestConfig& config) {
 
     // 计算总内存需求
     size_t total_memory_needed = frameCache_.frame_size * frameCache_.total_frames;
-    size_t available_memory = 1024 * 1024 * 1024;  // 假设有1GB可用内存
-
-    if (total_memory_needed > available_memory) {
-        frameCache_.use_disk_cache = true;
-        frameCache_.cache_dir = std::string(getenv("HOME")) + "/frame_cache";
-        std::filesystem::create_directories(frameCache_.cache_dir);
-    } else {
-        frameCache_.use_disk_cache = false;
-        frameCache_.frame_buffer.resize(frameCache_.total_frames);
-    }
+    
+    // 使用磁盘缓存以避免内存问题
+    frameCache_.use_disk_cache = true;
+    frameCache_.cache_dir = std::string(getenv("HOME")) + "/frame_cache";
+    std::filesystem::create_directories(frameCache_.cache_dir);
 
     return generateFrames(config);
 }
@@ -491,8 +486,14 @@ void X264ParamTest::generateFramesThreaded(const TestConfig& config, size_t thre
     size_t frames_per_thread = frameCache_.total_frames / thread_count;
     size_t remaining_frames = frameCache_.total_frames % thread_count;
 
-    gen_status_.completed_frames = 0;
-    gen_status_.is_generating = true;
+    // 重置生成状态
+    {
+        std::lock_guard<std::mutex> lock(gen_status_.mutex);
+        gen_status_.completed_frames = 0;
+        gen_status_.is_generating = true;
+        gen_status_.total_frames = frameCache_.total_frames;
+        gen_status_.last_progress = 0.0f;
+    }
 
     // 启动工作线程
     size_t start_frame = 0;
@@ -509,6 +510,17 @@ void X264ParamTest::generateFramesThreaded(const TestConfig& config, size_t thre
     // 等待所有线程完成
     for (auto& thread : threads) {
         thread.join();
+    }
+
+    // 确保所有帧都已生成
+    {
+        std::lock_guard<std::mutex> lock(gen_status_.mutex);
+        if (gen_status_.completed_frames >= gen_status_.total_frames && 
+            gen_status_.progress_callback && 
+            gen_status_.last_progress < 1.0f) {
+            gen_status_.last_progress = 1.0f;
+            gen_status_.progress_callback(1.0f);
+        }
     }
 
     gen_status_.is_generating = false;
@@ -537,10 +549,18 @@ void X264ParamTest::frameGenerationWorker(
         }
 
         // 更新进度
-        size_t completed = ++self->gen_status_.completed_frames;
-        if (self->gen_status_.progress_callback) {
-            float progress = static_cast<float>(completed) / self->frameCache_.total_frames;
-            self->gen_status_.progress_callback(progress);
+        {
+            std::lock_guard<std::mutex> lock(self->gen_status_.mutex);
+            size_t completed = ++self->gen_status_.completed_frames;
+            if (self->gen_status_.progress_callback) {
+                float progress = static_cast<float>(completed) / self->gen_status_.total_frames;
+                // 确保进度不超过1.0且只在进度变化时更新
+                progress = std::min(progress, 1.0f);
+                if (progress > self->gen_status_.last_progress) {
+                    self->gen_status_.last_progress = progress;
+                    self->gen_status_.progress_callback(progress);
+                }
+            }
         }
     }
 }

@@ -279,8 +279,11 @@ public:
 
     // 帧生成相关
     struct FrameGenerationStatus {
-        std::atomic<size_t> completed_frames{0};
-        std::atomic<bool> is_generating{false};
+        bool is_generating{false};
+        size_t completed_frames{0};
+        size_t total_frames{0};
+        float last_progress{0.0f};
+        std::mutex mutex;
         std::function<void(float)> progress_callback;
     } gen_status_;
 

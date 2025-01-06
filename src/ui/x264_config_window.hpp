@@ -12,6 +12,7 @@
 #include <QVideoWidget>
 #include <QSlider>
 #include "../ffmpeg/x264_param_test.hpp"
+#include <thread>
 
 class X264ConfigWindow : public QMainWindow {
     Q_OBJECT
@@ -91,4 +92,7 @@ private:
     QProgressBar* frameGenProgressBar_{};
     QPushButton* generateButton_{};
     QLabel* frameGenStatusLabel_{};
+
+    // 编码线程
+    std::thread encodingThread_;
 }; 

@@ -6,6 +6,8 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QTime>
+#include <QThread>
+#include <QScrollBar>
 #include <thread>
 #include <chrono>
 #include <QVideoWidget>
@@ -23,7 +25,12 @@ X264ConfigWindow::X264ConfigWindow(QWidget *parent)
     updateUIFromConfig(defaultConfig);
 }
 
-X264ConfigWindow::~X264ConfigWindow() = default;
+X264ConfigWindow::~X264ConfigWindow() {
+    shouldStop_ = true;
+    if (encodingThread_.joinable()) {
+        encodingThread_.join();
+    }
+}
 
 void X264ConfigWindow::setupUI()
 {
@@ -275,7 +282,10 @@ void X264ConfigWindow::onStartEncoding()
     appendLog(tr("正在启动编码线程...\n"));
     
     // 在新线程中运行编码测试
-    std::thread encodingThread([this, config]() {
+    if (encodingThread_.joinable()) {
+        encodingThread_.join();
+    }
+    encodingThread_ = std::thread([this, config]() {
         appendLog(tr("正在初始化编码器...\n"));
         
         auto result = X264ParamTest::runTest(config,
@@ -323,39 +333,67 @@ void X264ConfigWindow::onStartEncoding()
             onEncodingFinished();
         }, Qt::QueuedConnection);
     });
-    encodingThread.detach();
 }
 
-void X264ConfigWindow::updateProgress(int frame, double time, double fps, double bitrate, double psnr, double ssim)
+void X264ConfigWindow::updateProgress(int frame, double encodingTime, double fps, double bitrate, double psnr, double ssim)
 {
-    // 更新进度
-    int progress = (frame * 100) / frameCountSpinBox_->value();
+    static int lastUpdateFrame = 0;
+    static auto lastUpdateTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    
+    // 限制更新频率，每200ms更新一次
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdateTime).count() < 200) {
+        return;
+    }
+    
+    lastUpdateTime = now;
+    lastUpdateFrame = frame;
+    
+    // 更新进度条
+    int progress = static_cast<int>(frame * 100.0 / frameCountSpinBox_->value());
     progressBar_->setValue(progress);
     
-    // 每秒最多更新5次日志
-    static auto lastUpdate = std::chrono::steady_clock::now();
-    auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() >= 200) {
-        // 更新日志
-        QString log = QString("Frame: %1\n编码时间: %2秒\n编码速度: %3 fps\n"
-                            "码率: %4 kbps\nPSNR: %5\nSSIM: %6\n")
-                        .arg(frame)
-                        .arg(time, 0, 'f', 2)
-                        .arg(fps, 0, 'f', 2)
-                        .arg(bitrate / 1000.0, 0, 'f', 2)
-                        .arg(psnr, 0, 'f', 2)
-                        .arg(ssim, 0, 'f', 3);
-        logTextEdit_->append(log);
-        lastUpdate = now;
+    // 只在整数百分比变化时更新状态
+    static int lastProgress = -1;
+    if (progress != lastProgress) {
+        lastProgress = progress;
         
-        // 处理Qt事件，保持UI响应
-        QApplication::processEvents();
+        QString status = QString("帧: %1/%2 | FPS: %3 | 码率: %4 kbps")
+            .arg(frame)
+            .arg(frameCountSpinBox_->value())
+            .arg(fps, 0, 'f', 1)
+            .arg(bitrate / 1000.0, 0, 'f', 0);
+            
+        if (psnr > 0) {
+            status += QString(" | PSNR: %1").arg(psnr, 0, 'f', 2);
+        }
+        if (ssim > 0) {
+            status += QString(" | SSIM: %1").arg(ssim, 0, 'f', 3);
+        }
+        
+        // 只在整5%的进度时更新日志
+        if (progress % 5 == 0) {
+            appendLog(status);
+        }
     }
 }
 
 void X264ConfigWindow::appendLog(const QString& text)
 {
+    // 如果不在主线程，使用信号槽机制
+    if (QThread::currentThread() != QApplication::instance()->thread()) {
+        QMetaObject::invokeMethod(this, "appendLog",
+            Qt::QueuedConnection,
+            Q_ARG(QString, text));
+        return;
+    }
+    
+    // 在主线程中直接更新
     logTextEdit_->append(text);
+    
+    // 滚动到底部
+    QScrollBar* scrollBar = logTextEdit_->verticalScrollBar();
+    scrollBar->setValue(scrollBar->maximum());
 }
 
 void X264ConfigWindow::onEncodingFinished()
@@ -544,15 +582,38 @@ void X264ConfigWindow::onGenerateFrames()
     std::thread([this, config]() {
         X264ParamTest test;
         test.gen_status_.progress_callback = [this](float progress) {
+            static auto lastUpdateTime = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            static int lastPercent = -1;
+            
+            // 限制更新频率为每200ms更新一次
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdateTime).count() < 200) {
+                return;
+            }
+            lastUpdateTime = now;
+            
             // 使用Qt的信号槽机制更新UI
             QMetaObject::invokeMethod(this, [this, progress]() {
-                int percent = static_cast<int>(progress * 100);
-                frameGenProgressBar_->setValue(percent);
-                appendLog(tr("\r生成进度: %1%").arg(percent));
+                int percent = static_cast<int>(std::round(progress * 100));
                 
-                // 每10%更新一次进度
-                if (percent % 10 == 0) {
+                // 确保进度不会后退
+                static int lastPercent = -1;
+                if (percent < lastPercent && lastPercent < 100) {
+                    return;
+                }
+                lastPercent = percent;
+                
+                frameGenProgressBar_->setValue(percent);
+                
+                // 只在整10%时更新日志，或在100%时
+                if (percent % 10 == 0 || percent == 100) {
                     appendLog(tr("\n已生成 %1% 的帧\n").arg(percent));
+                }
+
+                // 如果是100%，更新状态
+                if (percent == 100) {
+                    frameGenStatusLabel_->setText(tr("帧生成完成"));
+                    generateButton_->setEnabled(true);
                 }
             }, Qt::QueuedConnection);
         };
@@ -564,11 +625,14 @@ void X264ConfigWindow::onGenerateFrames()
             double duration = std::chrono::duration<double>(end_time - start_time).count();
             
             QMetaObject::invokeMethod(this, [this, duration]() {
-                frameGenStatusLabel_->setText(tr("帧生成完成"));
-                generateButton_->setEnabled(true);
                 appendLog(tr("\n帧生成完成!\n"));
                 appendLog(tr("总耗时: %1 秒\n").arg(duration, 0, 'f', 2));
                 appendLog(tr("平均速度: %1 帧/秒\n").arg(frameCountSpinBox_->value() / duration, 0, 'f', 1));
+                
+                // 确保最终状态正确
+                frameGenProgressBar_->setValue(100);
+                frameGenStatusLabel_->setText(tr("帧生成完成"));
+                generateButton_->setEnabled(true);
             }, Qt::QueuedConnection);
         } else {
             QMetaObject::invokeMethod(this, [this]() {
