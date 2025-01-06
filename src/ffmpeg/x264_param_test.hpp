@@ -105,13 +105,15 @@ public:
     };
 
     struct TestResult {
-        double encodingTime;    // 编码时间
-        double fps;            // 编码速度
-        double bitrate;        // 实际码率
-        double psnr;          // 峰值信噪比
-        double ssim;          // 结构相似度
-        bool success;
+        double encodingTime{0.0};    // 编码时间
+        double fps{0.0};            // 编码速度
+        double bitrate{0.0};        // 实际码率
+        double psnr{0.0};          // 峰值信噪比
+        double ssim{0.0};          // 结构相似度
+        bool success{false};
         std::string errorMessage;
+
+        TestResult() = default;
     };
 
     // 预定义场景配置
