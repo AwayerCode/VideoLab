@@ -14,6 +14,10 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 set(SOURCES
     ffmpeg.cpp
     analyzer.cpp
+    videofilter.cpp
+    x264_param_test.cpp
+    x265_param_test.cpp
+    encoder_test.cpp
 )
 
 # 创建库
