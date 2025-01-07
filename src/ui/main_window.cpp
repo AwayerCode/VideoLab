@@ -42,16 +42,28 @@ void MainWindow::setupUI() {
     // 创建并设置标签页
     createTabs();
     
-    // 创建x264配置窗口
-    x264Window_ = new X264ConfigWindow(this);
+    // 创建堆叠窗口部件
+    stackedWidget_ = new QStackedWidget(this);
     
-    // 将标签页和x264窗口添加到主布局
+    // 创建各个配置窗口
+    x264Window_ = new X264ConfigWindow(this);
+    mp4Window_ = new QWidget(this);  // 临时使用空白窗口
+    x265Window_ = new QWidget(this); // 临时使用空白窗口
+    h264Window_ = new QWidget(this); // 临时使用空白窗口
+    
+    // 将窗口添加到堆叠窗口部件中
+    stackedWidget_->addWidget(x264Window_);
+    stackedWidget_->addWidget(mp4Window_);
+    stackedWidget_->addWidget(x265Window_);
+    stackedWidget_->addWidget(h264Window_);
+    
+    // 将标签页和堆叠窗口添加到主布局
     mainLayout_->addWidget(tabWidget_);
-    mainLayout_->addWidget(x264Window_);
+    mainLayout_->addWidget(stackedWidget_);
     
     // 设置布局比例
     mainLayout_->setStretch(0, 0);  // 标签页不参与拉伸
-    mainLayout_->setStretch(1, 1);  // x264窗口占用所有剩余空间
+    mainLayout_->setStretch(1, 1);  // 堆叠窗口占用所有剩余空间
 }
 
 void MainWindow::createTabs() {
@@ -119,8 +131,7 @@ void MainWindow::createTabs() {
     
     // 连接标签页切换信号
     connect(tabWidget_, &QTabWidget::currentChanged, this, [this](int index) {
-        // 根据选中的标签页显示相应的内容
-        x264Window_->setVisible(index == 0);  // 只在第一个标签页显示x264窗口
-        // TODO: 处理其他标签页的内容
+        // 切换到对应的堆叠窗口页面
+        stackedWidget_->setCurrentIndex(index);
     });
 } 

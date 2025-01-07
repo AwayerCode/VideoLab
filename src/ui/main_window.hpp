@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QTabBar>
 #include <QTransform>
+#include <QStackedWidget>
 #include "x264_config_window.hpp"
 
 class MainWindow : public QMainWindow {
@@ -26,7 +27,11 @@ private:
     QWidget* centralWidget_;
     QHBoxLayout* mainLayout_;
     QTabWidget* tabWidget_;
+    QStackedWidget* stackedWidget_;
     X264ConfigWindow* x264Window_;
+    QWidget* mp4Window_;
+    QWidget* x265Window_;
+    QWidget* h264Window_;
 
     // 图标
     QIcon x264Icon_;
