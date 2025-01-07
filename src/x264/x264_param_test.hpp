@@ -13,7 +13,6 @@ extern "C" {
 #include <mutex>
 #include <queue>
 #include <condition_variable>
-#include "core/encoder_test.hpp"
 
 class X264ParamTest {
 public:

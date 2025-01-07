@@ -2,7 +2,6 @@
 
 #include <string>
 #include <functional>
-#include "core/encoder_test.hpp"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

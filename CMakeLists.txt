@@ -27,12 +27,8 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 # 设置所有源文件
 set(PROJECT_SOURCES
     src/main.cpp
-    src/core/ffmpeg.cpp
-    src/core/encoder_test.cpp
     src/x264/x264_param_test.cpp
     src/x265/x265_param_test.cpp
-    src/filter/videofilter.cpp
-    src/format/analyzer.cpp
     src/ui/x264_config_window.cpp
 )
 
