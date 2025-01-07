@@ -1,3 +1,4 @@
+#include <filesystem>
 #include "x264_param_test.hpp"
 #include <iostream>
 #include <iomanip>
@@ -623,16 +624,29 @@ X264ParamTest::TestResult X264ParamTest::runTest(
         return result;
     }
 
-    // 创建输出文件名
+    // 生成输出文件名
     std::string outputFile;
-    const char* home = getenv("HOME");
-    if (home) {
-        outputFile = std::string(home) + "/output_" + 
-            std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".mp4";
-    } else {
-        outputFile = "output_" + 
-            std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".mp4";
+    const char* workDir = getenv("PWD");
+    if (!workDir) {
+        std::cerr << "无法获取当前工作目录" << std::endl;
+        result.errorMessage = "无法获取当前工作目录";
+        return result;
     }
+    
+    std::string outputDir = std::string(workDir) + "/datas";
+    
+    // 确保输出目录存在
+    if (system(("mkdir -p '" + outputDir + "'").c_str()) != 0) {
+        std::cerr << "无法创建输出目录: " << outputDir << std::endl;
+        result.errorMessage = "无法创建输出目录";
+        return result;
+    }
+    
+    outputFile = outputDir + "/output_" +
+                std::to_string(config.width) + "x" + std::to_string(config.height) + "_" +
+                std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) +
+                ".mp4";
+    
     std::cout << "输出文件: " << outputFile << std::endl;
 
     X264ParamTest test;
