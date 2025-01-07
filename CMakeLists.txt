@@ -40,12 +40,9 @@ set(PROJECT_SOURCES
     src/ui/x264_config_window.cpp
     src/ui/main_window.cpp
     src/format/mp4_parser.cpp
-    src/format/h264_parser.cpp
     src/format/aac_parser.cpp
     src/ui/mp4_config_window.cpp
     src/ui/mp4_box_view.cpp
-    src/ui/h264_config_window.cpp
-    src/ui/h264_matrix_view.cpp
     src/ui/aac_config_window.cpp
     src/ui/aac_frame_view.cpp
 )
@@ -57,12 +54,9 @@ set(PROJECT_HEADERS
     src/x264/x264_param_test.hpp
     src/x265/x265_param_test.hpp
     src/format/mp4_parser.hpp
-    src/format/h264_parser.hpp
     src/format/aac_parser.hpp
     src/ui/mp4_config_window.hpp
     src/ui/mp4_box_view.hpp
-    src/ui/h264_config_window.hpp
-    src/ui/h264_matrix_view.hpp
     src/ui/aac_config_window.hpp
     src/ui/aac_frame_view.hpp
 )
