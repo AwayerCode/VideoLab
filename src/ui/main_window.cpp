@@ -47,7 +47,7 @@ void MainWindow::setupUI() {
     
     // 创建各个配置窗口
     x264Window_ = new X264ConfigWindow(this);
-    mp4Window_ = new QWidget(this);  // 临时使用空白窗口
+    mp4Window_ = new MP4ConfigWindow(this);  // 使用新的MP4ConfigWindow
     x265Window_ = new QWidget(this); // 临时使用空白窗口
     h264Window_ = new QWidget(this); // 临时使用空白窗口
     

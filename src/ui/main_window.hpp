@@ -11,6 +11,7 @@
 #include <QTransform>
 #include <QStackedWidget>
 #include "x264_config_window.hpp"
+#include "mp4_config_window.hpp"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,7 +30,7 @@ private:
     QTabWidget* tabWidget_;
     QStackedWidget* stackedWidget_;
     X264ConfigWindow* x264Window_;
-    QWidget* mp4Window_;
+    MP4ConfigWindow* mp4Window_;
     QWidget* x265Window_;
     QWidget* h264Window_;
 
