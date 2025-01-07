@@ -1,25 +1,54 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QWidget>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QComboBox>
 #include <QSpinBox>
-#include <QDoubleSpinBox>
 #include <QCheckBox>
-#include <QProgressBar>
+#include <QLabel>
+#include <QPushButton>
 #include <QTextEdit>
-#include <QSlider>
-#include <QGroupBox>
+#include <QProgressBar>
 #include <QMediaPlayer>
 #include <QVideoWidget>
-#include <QTimer>
-
+#include <QSlider>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include "encode/vp8_param_test.hpp"
+#include <thread>
+
+// 历史记录结构体
+struct VP8EncodingRecord {
+    // 输入参数
+    int width;
+    int height;
+    int frameCount;
+    QString preset;     // best/good/realtime
+    int speed;         // 0-16
+    int threads;
+    QString rateControl;
+    int rateValue;     // bitrate或CQ值
+    int keyint;        // 关键帧间隔
+    int qmin;          // 最小量化参数
+    int qmax;          // 最大量化参数
+    
+    // 编码结果
+    double encodingTime;
+    double fps;
+    double bitrate;
+    double psnr;
+    double ssim;
+    QString outputFile;
+    
+    // 时间戳
+    QDateTime timestamp;
+};
 
 class VP8ConfigWindow : public QMainWindow {
     Q_OBJECT
@@ -28,81 +57,70 @@ public:
     explicit VP8ConfigWindow(QWidget *parent = nullptr);
     ~VP8ConfigWindow() override;
 
-private slots:
+public Q_SLOTS:
     void onStartEncoding();
     void onStopEncoding();
     void onRateControlChanged(int index);
     void onPresetConfigSelected(int index);
+    void onSceneConfigChanged(int index);
     void onPlayVideo();
     void onMediaPositionChanged(qint64 position);
     void onMediaDurationChanged(qint64 duration);
     void onSliderMoved(int position);
+    void updateProgress(int frame, double time, double fps, double bitrate, double psnr, double ssim);
+    void appendLog(const QString& text);
+    void onEncodingFinished();
     void onGenerateFrames();
-    void updateProgress(int frame, double encodingTime, double fps, double bitrate, double psnr, double ssim);
+    void addEncodingRecord(const VP8EncodingRecord& record);
+    void clearEncodingHistory();
+    void exportEncodingHistory();
 
 private:
     void setupUI();
     void createConnections();
-    void appendLog(const QString& text);
-    void onEncodingFinished();
     void updateUIFromConfig(const VP8ParamTest::TestConfig& config);
     VP8ParamTest::TestConfig getConfigFromUI() const;
+    void updateHistoryTable();
+    void saveHistoryToFile();
 
-    // UI组件
-    QWidget* centralWidget_{nullptr};
-    QVBoxLayout* mainLayout_{nullptr};
-    
-    // 基本参数设置
-    QGroupBox* basicParamsGroup_{nullptr};
-    QComboBox* presetCombo_{nullptr};
-    QComboBox* speedCombo_{nullptr};
-    QComboBox* rateControlCombo_{nullptr};
-    QSpinBox* bitrateSpinBox_{nullptr};
-    QSpinBox* cqLevelSpinBox_{nullptr};
-    QSpinBox* qminSpinBox_{nullptr};
-    QSpinBox* qmaxSpinBox_{nullptr};
-    QSpinBox* keyintSpinBox_{nullptr};
-    QSpinBox* threadsSpinBox_{nullptr};
+    // 基本参数控件
+    QComboBox* presetCombo_{};      // best/good/realtime
+    QComboBox* speedCombo_{};       // 0-16
+    QSpinBox* threadsSpinBox_{};
+    QSpinBox* widthSpinBox_{};
+    QSpinBox* heightSpinBox_{};
+    QSpinBox* frameCountSpinBox_{};
+    QComboBox* rateControlCombo_{};
+    QSpinBox* rateValueSpinBox_{};  // bitrate或CQ值
+    QSpinBox* keyintSpinBox_{};
+    QSpinBox* qminSpinBox_{};
+    QSpinBox* qmaxSpinBox_{};
+    QComboBox* sceneConfigCombo_{};
 
-    // 分辨率和帧率设置
-    QGroupBox* videoParamsGroup_{nullptr};
-    QSpinBox* widthSpinBox_{nullptr};
-    QSpinBox* heightSpinBox_{nullptr};
-    QSpinBox* fpsSpinBox_{nullptr};
-    QSpinBox* framesSpinBox_{nullptr};
+    // 编码控制控件
+    QPushButton* startButton_{};
+    QPushButton* stopButton_{};
+    QProgressBar* progressBar_{};
+    QTextEdit* logTextEdit_{};
+    bool shouldStop_{false};
+    std::thread encodingThread_{};
 
-    // 输出设置
-    QGroupBox* outputGroup_{nullptr};
-    QLineEdit* outputPathEdit_{nullptr};
-    QPushButton* browseButton_{nullptr};
+    // 帧生成控件
+    QLabel* frameGenStatusLabel_{};
+    QProgressBar* frameGenProgressBar_{};
+    QPushButton* generateButton_{};
 
-    // 控制按钮
-    QHBoxLayout* controlLayout_{nullptr};
-    QPushButton* generateButton_{nullptr};
-    QPushButton* startButton_{nullptr};
-    QPushButton* stopButton_{nullptr};
-    QPushButton* playButton_{nullptr};
+    // 视频播放控件
+    QVideoWidget* videoWidget_{};
+    QMediaPlayer* mediaPlayer_{};
+    QPushButton* playButton_{};
+    QSlider* videoSlider_{};
+    QLabel* timeLabel_{};
+    QString currentOutputFile_{};
 
-    // 进度显示
-    QGroupBox* progressGroup_{nullptr};
-    QProgressBar* progressBar_{nullptr};
-    QLabel* timeLabel_{nullptr};
-    QLabel* fpsLabel_{nullptr};
-    QLabel* bitrateLabel_{nullptr};
-    QLabel* psnrLabel_{nullptr};
-    QLabel* ssimLabel_{nullptr};
-
-    // 日志显示
-    QGroupBox* logGroup_{nullptr};
-    QTextEdit* logEdit_{nullptr};
-
-    // 视频预览
-    QGroupBox* previewGroup_{nullptr};
-    QVideoWidget* videoWidget_{nullptr};
-    QSlider* videoSlider_{nullptr};
-    QMediaPlayer* mediaPlayer_{nullptr};
-
-    // 状态变量
-    bool isEncoding_{false};
-    bool isPlaying_{false};
+    // 历史记录控件
+    QTableWidget* historyTable_{};
+    QPushButton* clearHistoryButton_{};
+    QPushButton* exportHistoryButton_{};
+    std::vector<VP8EncodingRecord> encodingHistory_;
 }; 
