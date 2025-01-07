@@ -9,7 +9,7 @@ MainWindow::MainWindow(QWidget* parent)
     setupUI();
     
     // 设置窗口标题
-    setWindowTitle(tr("跨平台视频编解码工具"));
+    setWindowTitle(tr("VideoLab"));
     
     // 设置窗口大小为屏幕大小的60%
     QScreen* screen = QApplication::primaryScreen();
