@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# 设置自动处理 Qt MOC、UIC、RCC
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
 # 查找OpenMP
 find_package(OpenMP REQUIRED)
 
@@ -24,23 +29,32 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libswresample
 )
 
+# 设置头文件目录
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 # 设置所有源文件
 set(PROJECT_SOURCES
     src/main.cpp
     src/x264/x264_param_test.cpp
     src/x265/x265_param_test.cpp
     src/ui/x264_config_window.cpp
+    src/ui/main_window.cpp
     src/mp4/mp4_parser.cpp
 )
 
-# 创建可执行文件
-add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+# 设置所有头文件
+set(PROJECT_HEADERS
+    src/ui/main_window.hpp
+    src/ui/x264_config_window.hpp
+    src/x264/x264_param_test.hpp
+    src/x265/x265_param_test.hpp
+    src/mp4/mp4_parser.hpp
+)
 
-# 设置Qt自动生成
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    AUTOMOC ON
-    AUTORCC ON
-    AUTOUIC ON
+# 创建可执行文件
+add_executable(${PROJECT_NAME} 
+    ${PROJECT_SOURCES}
+    ${PROJECT_HEADERS}
 )
 
 # 设置包含目录
