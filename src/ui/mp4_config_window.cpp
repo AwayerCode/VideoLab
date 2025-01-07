@@ -1,5 +1,5 @@
 #include "mp4_config_window.hpp"
-#include "../mp4/mp4_parser.hpp"
+#include "../format/mp4_parser.hpp"
 
 MP4ConfigWindow::MP4ConfigWindow(QWidget* parent)
     : QWidget(parent)

@@ -39,7 +39,7 @@ set(PROJECT_SOURCES
     src/x265/x265_param_test.cpp
     src/ui/x264_config_window.cpp
     src/ui/main_window.cpp
-    src/mp4/mp4_parser.cpp
+    src/format/mp4_parser.cpp
     src/ui/mp4_config_window.cpp
     src/ui/mp4_box_view.cpp
 )
@@ -50,7 +50,7 @@ set(PROJECT_HEADERS
     src/ui/x264_config_window.hpp
     src/x264/x264_param_test.hpp
     src/x265/x265_param_test.hpp
-    src/mp4/mp4_parser.hpp
+    src/format/mp4_parser.hpp
     src/ui/mp4_config_window.hpp
     src/ui/mp4_box_view.hpp
 )
