@@ -35,8 +35,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # 设置所有源文件
 set(PROJECT_SOURCES
     src/main.cpp
-    src/x264/x264_param_test.cpp
-    src/x265/x265_param_test.cpp
+    src/encode/x264_param_test.cpp
+    src/encode/x265_param_test.cpp
     src/ui/x264_config_window.cpp
     src/ui/main_window.cpp
     src/format/mp4_parser.cpp
@@ -51,8 +51,8 @@ set(PROJECT_SOURCES
 set(PROJECT_HEADERS
     src/ui/main_window.hpp
     src/ui/x264_config_window.hpp
-    src/x264/x264_param_test.hpp
-    src/x265/x265_param_test.hpp
+    src/encode/x264_param_test.hpp
+    src/encode/x265_param_test.hpp
     src/format/mp4_parser.hpp
     src/format/aac_parser.hpp
     src/ui/mp4_config_window.hpp
