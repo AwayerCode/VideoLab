@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+#include <functional>
+#include "core/encoder_test.hpp"
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -7,10 +11,8 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 
-#include <string>
 #include <chrono>
 #include <memory>
-#include <functional>
 #include <vector>
 
 class X265ParamTest {

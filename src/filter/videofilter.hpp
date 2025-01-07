@@ -1,5 +1,10 @@
 #pragma once
 
+#include <string>
+#include <memory>
+#include <functional>
+#include "core/ffmpeg.hpp"
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -9,9 +14,6 @@ extern "C" {
 #include <libswscale/swscale.h>
 #include <libavutil/opt.h>
 }
-
-#include <string>
-#include <memory>
 
 class VideoFilter {
 public:

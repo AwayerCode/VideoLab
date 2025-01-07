@@ -20,7 +20,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
-#include "../ffmpeg/x264_param_test.hpp"
+#include "x264/x264_param_test.hpp"
 #include <thread>
 
 // 历史记录结构体

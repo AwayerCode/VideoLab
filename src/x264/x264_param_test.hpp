@@ -8,14 +8,12 @@ extern "C" {
 }
 
 #include <string>
-#include <chrono>
-#include <memory>
 #include <functional>
-#include <vector>
-#include <mutex>
-#include <condition_variable>
 #include <thread>
-#include <atomic>
+#include <mutex>
+#include <queue>
+#include <condition_variable>
+#include "core/encoder_test.hpp"
 
 class X264ParamTest {
 public:

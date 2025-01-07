@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <memory>
+#include "core/ffmpeg.hpp"
 
 extern "C" {
 #include <libavformat/avformat.h>
