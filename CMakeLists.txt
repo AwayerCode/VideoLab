@@ -30,6 +30,7 @@ set(PROJECT_SOURCES
     src/x264/x264_param_test.cpp
     src/x265/x265_param_test.cpp
     src/ui/x264_config_window.cpp
+    src/mp4/mp4_parser.cpp
 )
 
 # 创建可执行文件
