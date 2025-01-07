@@ -8,18 +8,18 @@ MainWindow::MainWindow(QWidget* parent)
 {
     setupUI();
     
-    // 设置窗口标题
+    // Set window title
     setWindowTitle(tr("VideoLab"));
     
-    // 设置窗口大小为屏幕大小的60%
+    // Set window size to 60% of screen size
     QScreen* screen = QApplication::primaryScreen();
     QSize screenSize = screen->availableSize();
     resize(screenSize.width() * 0.6, screenSize.height() * 0.7);
     
-    // 设置最小窗口大小
+    // Set minimum window size
     setMinimumSize(800, 600);
     
-    // 将窗口移动到屏幕中央
+    // Move window to screen center
     move((screenSize.width() - width()) / 2,
          (screenSize.height() - height()) / 2);
 }
@@ -27,56 +27,56 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow() = default;
 
 void MainWindow::setupUI() {
-    // 创建中央部件
+    // Create central widget
     centralWidget_ = new QWidget(this);
     setCentralWidget(centralWidget_);
     
-    // 设置窗口最小尺寸
+    // Set minimum window size
     this->setMinimumSize(800, 600);
     
-    // 创建主布局
+    // Create main layout
     mainLayout_ = new QHBoxLayout(centralWidget_);
     mainLayout_->setSpacing(0);
     mainLayout_->setContentsMargins(0, 0, 0, 0);
     
-    // 创建并设置标签页
+    // Create and setup tabs
     createTabs();
     
-    // 创建堆叠窗口部件
+    // Create stacked widget
     stackedWidget_ = new QStackedWidget(this);
     
-    // 创建各个配置窗口
+    // Create configuration windows
     x264Window_ = new X264ConfigWindow(this);
-    mp4Window_ = new MP4ConfigWindow(this);  // 使用新的MP4ConfigWindow
-    x265Window_ = new QWidget(this); // 临时使用空白窗口
-    h264Window_ = new QWidget(this); // 临时使用空白窗口
+    mp4Window_ = new MP4ConfigWindow(this);  // Use new MP4ConfigWindow
+    x265Window_ = new QWidget(this); // Temporary empty window
+    h264Window_ = new QWidget(this); // Temporary empty window
     
-    // 将窗口添加到堆叠窗口部件中
+    // Add windows to stacked widget
     stackedWidget_->addWidget(x264Window_);
     stackedWidget_->addWidget(mp4Window_);
     stackedWidget_->addWidget(x265Window_);
     stackedWidget_->addWidget(h264Window_);
     
-    // 将标签页和堆叠窗口添加到主布局
+    // Add tab widget and stacked widget to main layout
     mainLayout_->addWidget(tabWidget_);
     mainLayout_->addWidget(stackedWidget_);
     
-    // 设置布局比例
-    mainLayout_->setStretch(0, 0);  // 标签页不参与拉伸
-    mainLayout_->setStretch(1, 1);  // 堆叠窗口占用所有剩余空间
+    // Set layout stretch factors
+    mainLayout_->setStretch(0, 0);  // Tab widget doesn't stretch
+    mainLayout_->setStretch(1, 1);  // Stacked widget takes all remaining space
 }
 
 void MainWindow::createTabs() {
     tabWidget_ = new QTabWidget(this);
-    tabWidget_->setTabPosition(QTabWidget::West);  // 标签页位于左侧
+    tabWidget_->setTabPosition(QTabWidget::West);  // Tabs on the left side
     
-    // 添加标签页
+    // Add tab pages
     QWidget* x264Tab = new QWidget();
     QWidget* mp4Tab = new QWidget();
     QWidget* x265Tab = new QWidget();
     QWidget* h264Tab = new QWidget();
     
-    // 设置标签页样式
+    // Set tab widget style
     tabWidget_->setStyleSheet(R"(
         QTabWidget::pane {
             border: none;
@@ -108,16 +108,16 @@ void MainWindow::createTabs() {
         }
     )");
     
-    // 添加标签页并设置文字
+    // Add tabs and set text
     QTabBar* tabBar = tabWidget_->tabBar();
     
-    tabWidget_->addTab(x264Tab, "");  // 添加空文本的标签
+    tabWidget_->addTab(x264Tab, "");  // Add tab with empty text
     tabWidget_->addTab(mp4Tab, "");
     tabWidget_->addTab(x265Tab, "");
     tabWidget_->addTab(h264Tab, "");
     
-    // 设置标签页文字
-    QStringList tabTexts = {"x264", "MP4", "x265", "H264"};
+    // Set tab labels
+    QStringList tabTexts = {"x264 Encoder", "MP4 Parser", "x265 Encoder", "H264 Parser"};
     for(int i = 0; i < tabBar->count(); i++) {
         QLabel* label = new QLabel(tabTexts[i]);
         label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -126,12 +126,12 @@ void MainWindow::createTabs() {
         tabBar->setTabToolTip(i, tabTexts[i]);
     }
     
-    // 调整标签页宽度
+    // Adjust tab width
     tabWidget_->setFixedWidth(150);
     
-    // 连接标签页切换信号
+    // Connect tab change signal
     connect(tabWidget_, &QTabWidget::currentChanged, this, [this](int index) {
-        // 切换到对应的堆叠窗口页面
+        // Switch to corresponding stacked widget page
         stackedWidget_->setCurrentIndex(index);
     });
 } 

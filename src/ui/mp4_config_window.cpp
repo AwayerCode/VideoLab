@@ -6,8 +6,8 @@ MP4ConfigWindow::MP4ConfigWindow(QWidget* parent)
     , mainLayout_(new QVBoxLayout(this))
     , fileSelectLayout_(new QHBoxLayout())
     , filePathEdit_(new QLineEdit(this))
-    , selectFileBtn_(new QPushButton("选择文件", this))
-    , analyzeBtn_(new QPushButton("解析MP4", this))
+    , selectFileBtn_(new QPushButton("Select File", this))
+    , analyzeBtn_(new QPushButton("Analyze MP4", this))
     , resultDisplay_(new QTextEdit(this))
     , boxScrollArea_(new QScrollArea(this))
     , boxView_(new MP4BoxView(this))
@@ -20,40 +20,42 @@ MP4ConfigWindow::~MP4ConfigWindow() = default;
 
 void MP4ConfigWindow::setupUI()
 {
-    // 设置文件选择区域
-    fileSelectLayout_->addWidget(new QLabel("MP4文件：", this));
+    // Set file selection area
+    fileSelectLayout_->addWidget(new QLabel("MP4 File:", this));
     fileSelectLayout_->addWidget(filePathEdit_);
     fileSelectLayout_->addWidget(selectFileBtn_);
     
-    // 创建水平分割布局
+    // Create horizontal split layout
     auto* horizontalLayout = new QHBoxLayout();
     
-    // 左侧文本显示区域
+    // Left text display area
     auto* leftWidget = new QWidget(this);
     auto* leftLayout = new QVBoxLayout(leftWidget);
     leftLayout->addWidget(resultDisplay_);
-    leftWidget->setMaximumWidth(400);  // 限制左侧宽度
+    leftWidget->setMaximumWidth(400);  // Limit left side width
     
-    // 右侧box视图区域
+    // Right box view area
     boxScrollArea_->setWidget(boxView_);
     boxScrollArea_->setWidgetResizable(true);
     boxScrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     boxScrollArea_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
-    // 添加到水平布局
+    // Add to horizontal layout
     horizontalLayout->addWidget(leftWidget);
     horizontalLayout->addWidget(boxScrollArea_);
     
-    // 设置主布局
+    // Set main layout
     mainLayout_->addLayout(fileSelectLayout_);
     mainLayout_->addWidget(analyzeBtn_);
     mainLayout_->addLayout(horizontalLayout);
     
-    // 设置结果显示区域属性
+    // Set result display properties
     resultDisplay_->setReadOnly(true);
-    resultDisplay_->setPlaceholderText("MP4文件解析结果将在这里显示...");
+    resultDisplay_->setPlaceholderText("MP4 file analysis results will be displayed here...");
     
-    // 设置按钮状态
+    // Set button properties
+    selectFileBtn_->setText("Select File");
+    analyzeBtn_->setText("Analyze MP4");
     analyzeBtn_->setEnabled(false);
 }
 
@@ -70,9 +72,9 @@ void MP4ConfigWindow::onSelectFile()
 {
     QString filePath = QFileDialog::getOpenFileName(
         this,
-        "选择MP4文件",
+        "Select MP4 File",
         QString(),
-        "MP4文件 (*.mp4);;所有文件 (*.*)"
+        "MP4 Files (*.mp4);;All Files (*.*)"
     );
     
     if (!filePath.isEmpty()) {
@@ -88,27 +90,27 @@ void MP4ConfigWindow::onAnalyzeMP4()
     }
 
     resultDisplay_->clear();
-    resultDisplay_->append("开始解析MP4文件...\n");
+    resultDisplay_->append("Starting MP4 file analysis...\n");
     boxView_->clear();
     
     try {
         MP4Parser parser;
         if (!parser.open(filePath.toStdString())) {
-            resultDisplay_->append("无法打开MP4文件！");
+            resultDisplay_->append("Failed to open MP4 file!");
             return;
         }
 
-        // 获取视频信息
+        // Get video information
         auto videoInfo = parser.getVideoInfo();
-        resultDisplay_->append(QString("视频信息：\n"
-                                     "分辨率: %1x%2\n"
-                                     "时长: %3 秒\n"
-                                     "比特率: %4 kbps\n"
-                                     "帧率: %5 fps\n"
-                                     "总帧数: %6\n"
-                                     "关键帧数: %7\n"
-                                     "编码器: %8\n"
-                                     "格式: %9")
+        resultDisplay_->append(QString("Video Information:\n"
+                                     "Resolution: %1x%2\n"
+                                     "Duration: %3 sec\n"
+                                     "Bitrate: %4 kbps\n"
+                                     "Frame Rate: %5 fps\n"
+                                     "Total Frames: %6\n"
+                                     "Keyframes: %7\n"
+                                     "Codec: %8\n"
+                                     "Format: %9")
                                      .arg(videoInfo.width)
                                      .arg(videoInfo.height)
                                      .arg(videoInfo.duration, 0, 'f', 2)
@@ -119,15 +121,15 @@ void MP4ConfigWindow::onAnalyzeMP4()
                                      .arg(QString::fromStdString(videoInfo.codec_name))
                                      .arg(QString::fromStdString(videoInfo.format_name)));
 
-        // 获取音频信息
+        // Get audio information
         auto audioInfo = parser.getAudioInfo();
-        if (audioInfo.channels > 0) {  // 如果有音频流
-            resultDisplay_->append(QString("\n音频信息：\n"
-                                         "声道数: %1\n"
-                                         "采样率: %2 Hz\n"
-                                         "时长: %3 秒\n"
-                                         "比特率: %4 kbps\n"
-                                         "编码器: %5")
+        if (audioInfo.channels > 0) {  // If has audio stream
+            resultDisplay_->append(QString("\nAudio Information:\n"
+                                         "Channels: %1\n"
+                                         "Sample Rate: %2 Hz\n"
+                                         "Duration: %3 sec\n"
+                                         "Bitrate: %4 kbps\n"
+                                         "Codec: %5")
                                          .arg(audioInfo.channels)
                                          .arg(audioInfo.sample_rate)
                                          .arg(audioInfo.duration, 0, 'f', 2)
@@ -135,10 +137,10 @@ void MP4ConfigWindow::onAnalyzeMP4()
                                          .arg(QString::fromStdString(audioInfo.codec_name)));
         }
 
-        // 获取元数据
+        // Get metadata
         auto metadata = parser.getMetadata();
         if (!metadata.empty()) {
-            resultDisplay_->append("\n元数据：");
+            resultDisplay_->append("\nMetadata:");
             for (const auto& [key, value] : metadata) {
                 resultDisplay_->append(QString("%1: %2")
                     .arg(QString::fromStdString(key))
@@ -146,29 +148,29 @@ void MP4ConfigWindow::onAnalyzeMP4()
             }
         }
 
-        // 获取关键帧信息
+        // Get keyframe information
         auto keyFrames = parser.getKeyFrameInfo();
         if (!keyFrames.empty()) {
-            resultDisplay_->append(QString("\n关键帧分布（前5个）："));
+            resultDisplay_->append(QString("\nKeyframe Distribution (First 5):"));
             int count = 0;
             for (const auto& kf : keyFrames) {
                 if (count >= 5) break;
-                resultDisplay_->append(QString("时间戳: %1 秒 (位置: %2)")
+                resultDisplay_->append(QString("Timestamp: %1 sec (Position: %2)")
                     .arg(kf.timestamp, 0, 'f', 2)
                     .arg(kf.pos));
                 count++;
             }
         }
 
-        // 获取并显示box信息
+        // Get and display box information
         auto boxes = parser.getBoxes();
         
-        // 添加box列表文本输出
+        // Add box list text output
         if (!boxes.empty()) {
-            resultDisplay_->append("\nMP4 Box列表：");
+            resultDisplay_->append("\nMP4 Box List:");
             for (const auto& box : boxes) {
                 QString indent = QString("  ").repeated(box.level);
-                resultDisplay_->append(QString("%1%2 (大小: %3 字节, 偏移: 0x%4)")
+                resultDisplay_->append(QString("%1%2 (Size: %3 bytes, Offset: 0x%4)")
                     .arg(indent)
                     .arg(QString::fromStdString(box.type))
                     .arg(box.size)
@@ -176,7 +178,7 @@ void MP4ConfigWindow::onAnalyzeMP4()
             }
         }
         
-        // 转换BoxInfo类型
+        // Convert BoxInfo type
         std::vector<MP4BoxView::BoxInfo> viewBoxes;
         viewBoxes.reserve(boxes.size());
         for (const auto& box : boxes) {
@@ -192,6 +194,6 @@ void MP4ConfigWindow::onAnalyzeMP4()
 
         parser.close();
     } catch (const std::exception& e) {
-        resultDisplay_->append("解析出错: " + QString(e.what()));
+        resultDisplay_->append("Error during analysis: " + QString(e.what()));
     }
 } 
