@@ -9,6 +9,7 @@ MainWindow::MainWindow(QWidget* parent)
     , x264ConfigWindow_(new X264ConfigWindow(this))
     , mp4ConfigWindow_(new MP4ConfigWindow(this))
     , h264ConfigWindow_(new H264ConfigWindow(this))
+    , aacConfigWindow_(new AACConfigWindow(this))
 {
     setupUI();
     createTabs();
@@ -27,4 +28,5 @@ void MainWindow::createTabs()
     tabWidget_->addTab(x264ConfigWindow_, "X264");
     tabWidget_->addTab(mp4ConfigWindow_, "MP4");
     tabWidget_->addTab(h264ConfigWindow_, "H264");
+    tabWidget_->addTab(aacConfigWindow_, "AAC");
 } 
