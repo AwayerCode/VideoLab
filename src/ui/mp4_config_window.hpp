@@ -8,6 +8,8 @@
 #include <QLineEdit>
 #include <QFileDialog>
 #include <QTextEdit>
+#include <QScrollArea>
+#include "mp4_box_view.hpp"
 
 class MP4ConfigWindow : public QWidget {
     Q_OBJECT
@@ -30,4 +32,6 @@ private:
     QPushButton* selectFileBtn_;
     QPushButton* analyzeBtn_;
     QTextEdit* resultDisplay_;
+    QScrollArea* boxScrollArea_;
+    MP4BoxView* boxView_;
 }; 

@@ -51,6 +51,13 @@ public:
         double timestamp; // 单位：秒
     };
 
+    struct BoxInfo {
+        std::string type;    // box类型
+        int64_t size;       // box大小
+        int64_t offset;     // 文件偏移
+        int level;          // 嵌套层级
+    };
+
     MP4Parser();
     ~MP4Parser();
 
@@ -63,6 +70,7 @@ public:
     AudioInfo getAudioInfo() const;
     std::map<std::string, std::string> getMetadata() const;
     std::vector<KeyFrameInfo> getKeyFrameInfo() const;
+    std::vector<BoxInfo> getBoxes() const;
     
     // 帧操作
     bool readNextFrame(Frame& frame);
@@ -83,10 +91,13 @@ private:
     
     VideoInfo videoInfo_;
     AudioInfo audioInfo_;
+    std::vector<BoxInfo> boxes_;
     
     void cleanup();
     bool initVideoCodec();
     bool initAudioCodec();
     void updateKeyFrameInfo();
+    void parseBoxes();
+    void parseBoxesRecursive(int64_t start_offset, int64_t total_size, int level = 0);
     std::vector<KeyFrameInfo> keyFrameInfo_;
 }; 

@@ -226,6 +226,10 @@ bool MP4Parser::open(const std::string& filename) {
     }
     
     std::cout << std::endl;
+
+    // 解析MP4 box结构
+    parseBoxes();
+
     return true;
 }
 
@@ -375,4 +379,53 @@ MP4Parser::AudioInfo MP4Parser::getAudioInfo() const {
 
 void MP4Parser::close() {
     cleanup();
+}
+
+void MP4Parser::parseBoxes() {
+    boxes_.clear();
+    
+    // 保存当前位置
+    int64_t original_pos = avio_tell(formatCtx_->pb);
+    
+    // 从头开始读取
+    avio_seek(formatCtx_->pb, 0, SEEK_SET);
+    
+    // 读取所有box
+    parseBoxesRecursive(0, avio_size(formatCtx_->pb));
+    
+    // 恢复原始位置
+    avio_seek(formatCtx_->pb, original_pos, SEEK_SET);
+}
+
+void MP4Parser::parseBoxesRecursive(int64_t start_offset, int64_t total_size, int level) {
+    AVIOContext* pb = formatCtx_->pb;
+    int64_t current_offset = start_offset;
+    
+    while (current_offset < total_size) {
+        int64_t size = avio_rb32(pb);  // 读取box大小
+        char type[5] = {0};
+        avio_read(pb, (unsigned char*)type, 4);  // 读取box类型
+        
+        BoxInfo box;
+        box.type = type;
+        box.size = size;
+        box.offset = current_offset;
+        box.level = level;
+        boxes_.push_back(box);
+        
+        // 处理特殊的box类型
+        if (box.type == "moov" || box.type == "trak" || box.type == "mdia" || 
+            box.type == "minf" || box.type == "stbl") {
+            // 这些box包含子box，递归解析
+            parseBoxesRecursive(current_offset + 8, current_offset + size, level + 1);
+        }
+        
+        // 移动到下一个box
+        current_offset += size;
+        avio_seek(pb, current_offset, SEEK_SET);
+    }
+}
+
+std::vector<MP4Parser::BoxInfo> MP4Parser::getBoxes() const {
+    return boxes_;
 } 

@@ -41,6 +41,7 @@ set(PROJECT_SOURCES
     src/ui/main_window.cpp
     src/mp4/mp4_parser.cpp
     src/ui/mp4_config_window.cpp
+    src/ui/mp4_box_view.cpp
 )
 
 # 设置所有头文件
@@ -51,6 +52,7 @@ set(PROJECT_HEADERS
     src/x265/x265_param_test.hpp
     src/mp4/mp4_parser.hpp
     src/ui/mp4_config_window.hpp
+    src/ui/mp4_box_view.hpp
 )
 
 # 创建可执行文件
