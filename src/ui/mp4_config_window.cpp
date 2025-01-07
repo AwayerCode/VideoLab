@@ -163,6 +163,19 @@ void MP4ConfigWindow::onAnalyzeMP4()
         // 获取并显示box信息
         auto boxes = parser.getBoxes();
         
+        // 添加box列表文本输出
+        if (!boxes.empty()) {
+            resultDisplay_->append("\nMP4 Box列表：");
+            for (const auto& box : boxes) {
+                QString indent = QString("  ").repeated(box.level);
+                resultDisplay_->append(QString("%1%2 (大小: %3 字节, 偏移: 0x%4)")
+                    .arg(indent)
+                    .arg(QString::fromStdString(box.type))
+                    .arg(box.size)
+                    .arg(QString::number(box.offset, 16).toUpper()));
+            }
+        }
+        
         // 转换BoxInfo类型
         std::vector<MP4BoxView::BoxInfo> viewBoxes;
         viewBoxes.reserve(boxes.size());
