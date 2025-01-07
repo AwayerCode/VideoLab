@@ -168,13 +168,62 @@ bool MP4Parser::extractH264(const std::string& outputPath) const
     
     AVPacket* packet = av_packet_alloc();
     
+    // 写入 SPS/PPS
+    if (stream->codecpar->extradata && stream->codecpar->extradata_size > 0) {
+        const uint8_t* extradata = stream->codecpar->extradata;
+        int extradata_size = stream->codecpar->extradata_size;
+        
+        // 遍历 extradata 中的 NALU
+        int offset = 0;
+        while (offset + 4 < extradata_size) {
+            // 获取 NALU 长度
+            int nalu_size = (extradata[offset] << 24) | 
+                           (extradata[offset + 1] << 16) | 
+                           (extradata[offset + 2] << 8) | 
+                           extradata[offset + 3];
+            
+            // 写入起始码
+            const uint8_t start_code[] = {0x00, 0x00, 0x00, 0x01};
+            outFile.write(reinterpret_cast<const char*>(start_code), 4);
+            
+            // 写入 NALU 数据
+            outFile.write(reinterpret_cast<const char*>(extradata + offset + 4), nalu_size);
+            
+            offset += 4 + nalu_size;
+        }
+    }
+    
     // 定位到文件开始
     av_seek_frame(impl_->formatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
     
     // 写入H264数据
     while (av_read_frame(impl_->formatCtx, packet) >= 0) {
         if (packet->stream_index == impl_->videoStreamIndex) {
-            outFile.write(reinterpret_cast<const char*>(packet->data), packet->size);
+            const uint8_t* data = packet->data;
+            int size = packet->size;
+            int offset = 0;
+            
+            // 处理 AVC1/H264 封装格式
+            while (offset + 4 < size) {
+                // 获取 NALU 长度
+                int nalu_size = (data[offset] << 24) | 
+                               (data[offset + 1] << 16) | 
+                               (data[offset + 2] << 8) | 
+                               data[offset + 3];
+                
+                if (nalu_size <= 0 || offset + 4 + nalu_size > size) {
+                    break;
+                }
+                
+                // 写入起始码
+                const uint8_t start_code[] = {0x00, 0x00, 0x00, 0x01};
+                outFile.write(reinterpret_cast<const char*>(start_code), 4);
+                
+                // 写入 NALU 数据
+                outFile.write(reinterpret_cast<const char*>(data + offset + 4), nalu_size);
+                
+                offset += 4 + nalu_size;
+            }
         }
         av_packet_unref(packet);
     }
