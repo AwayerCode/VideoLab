@@ -10,6 +10,7 @@
 struct AVFormatContext;
 struct AVStream;
 struct AVCodecParameters;
+struct AVIOContext;
 
 class MP4Parser {
 public:
@@ -72,4 +73,7 @@ public:
 
 private:
     std::unique_ptr<Impl> impl_;
+
+    void parseBoxes(AVIOContext* pb, int level, std::vector<BoxInfo>* boxes) const;
+    bool isContainerBox(const char* type) const;
 }; 

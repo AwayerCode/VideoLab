@@ -55,17 +55,79 @@ std::vector<MP4Parser::BoxInfo> MP4Parser::getBoxes() const
         return {};
     }
     
-    // 这里应该实现box解析逻辑
-    // 为简单起见，这里返回一个示例box
     std::vector<BoxInfo> boxes;
-    BoxInfo box;
-    box.type = "moov";
-    box.size = 1000;
-    box.offset = 0;
-    box.level = 0;
-    boxes.push_back(box);
+    
+    // 保存当前位置
+    int64_t original_pos = avio_tell(impl_->formatCtx->pb);
+    
+    // 定位到文件开始
+    avio_seek(impl_->formatCtx->pb, 0, SEEK_SET);
+    
+    // 解析box结构
+    parseBoxes(impl_->formatCtx->pb, 0, &boxes);
+    
+    // 恢复原始位置
+    avio_seek(impl_->formatCtx->pb, original_pos, SEEK_SET);
     
     return boxes;
+}
+
+void MP4Parser::parseBoxes(AVIOContext* pb, int level, std::vector<BoxInfo>* boxes) const
+{
+    while (!avio_feof(pb)) {
+        int64_t start_pos = avio_tell(pb);
+        
+        // 读取box大小和类型
+        uint32_t size = avio_rb32(pb);  // big-endian 32-bit size
+        char type[5] = {0};
+        avio_read(pb, (unsigned char*)type, 4);
+        
+        // 处理64位大小的box
+        uint64_t largesize = size;
+        if (size == 1) {
+            largesize = avio_rb64(pb);
+        }
+        
+        // 创建box信息
+        BoxInfo box;
+        box.type = type;
+        box.size = (size == 1) ? largesize : size;
+        box.offset = start_pos;
+        box.level = level;
+        boxes->push_back(box);
+        
+        // 处理容器box
+        if (isContainerBox(type)) {
+            parseBoxes(pb, level + 1, boxes);
+        } else {
+            // 跳过数据部分
+            int64_t data_size = (size == 1) ? (largesize - 16) : (size - 8);
+            if (data_size > 0) {
+                avio_skip(pb, data_size);
+            }
+        }
+        
+        // 如果是最后一个box或者size为0，退出循环
+        if (size == 0 || avio_feof(pb)) {
+            break;
+        }
+    }
+}
+
+bool MP4Parser::isContainerBox(const char* type) const
+{
+    static const char* containers[] = {
+        "moov", "trak", "edts", "mdia", "minf", "dinf", "stbl", "mvex",
+        "moof", "traf", "mfra", "skip", "meta", "ipro", "sinf", "fiin",
+        "paen", "meco", "mere"
+    };
+    
+    for (const char* container : containers) {
+        if (strcmp(type, container) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 MP4Parser::VideoInfo MP4Parser::getVideoInfo() const
