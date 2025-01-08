@@ -9,6 +9,8 @@
 #include <QHBoxLayout>
 #include <QFileDialog>
 #include <vlc/vlc.h>
+#include <vlc/libvlc_media.h>
+#include <vlc/libvlc_media_player.h>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMap>
@@ -28,15 +30,12 @@ private slots:
     void onPlayPause();
     void onPositionChanged(int position);
     void updateInterface();
-    void onAddToPlaylist();
-    void onPlaylistItemDoubleClicked(QListWidgetItem* item);
-    void onRemoveFromPlaylist();
-    void onClearPlaylist();
 
 private:
     void initUI();
     void initVLC();
     void cleanupVLC();
+    void updateMediaInfo();
 
     QWidget* videoWidget_;
     QPushButton* selectFileButton_;
@@ -51,11 +50,13 @@ private:
 
     bool isPlaying_;
 
-    QListWidget* playlistWidget_;
-    QPushButton* addToPlaylistButton_;
-    QPushButton* removeFromPlaylistButton_;
-    QPushButton* clearPlaylistButton_;
-    QMap<QString, QString> playlistMap_;
+    QLabel* titleLabel_;
+    QLabel* resolutionLabel_;
+    QLabel* bitrateLabel_;
+    QLabel* codecLabel_;
+    QLabel* audioInfoLabel_;
+    QLabel* durationLabel_;
+    QWidget* mediaInfoWidget_;
 };
 
 #endif // VLC_PLAYER_WINDOW_HPP 

@@ -41,25 +41,29 @@ void VLCPlayerWindow::initUI()
     // 创建时间标签
     timeLabel_ = new QLabel("00:00:00", this);
 
-    // 创建播放列表组件
-    playlistWidget_ = new QListWidget(this);
-    playlistWidget_->setMinimumWidth(200);
-    playlistWidget_->setSelectionMode(QAbstractItemView::SingleSelection);
+    // 创建媒体信息显示区域
+    mediaInfoWidget_ = new QWidget(this);
+    mediaInfoWidget_->setMinimumWidth(200);
+    mediaInfoWidget_->setStyleSheet("QLabel { color: #333333; }");
 
-    addToPlaylistButton_ = new QPushButton(tr("添加到播放列表"), this);
-    removeFromPlaylistButton_ = new QPushButton(tr("移除"), this);
-    clearPlaylistButton_ = new QPushButton(tr("清空列表"), this);
+    // 创建媒体信息标签
+    titleLabel_ = new QLabel(tr("标题："), mediaInfoWidget_);
+    resolutionLabel_ = new QLabel(tr("分辨率："), mediaInfoWidget_);
+    bitrateLabel_ = new QLabel(tr("码率："), mediaInfoWidget_);
+    codecLabel_ = new QLabel(tr("编码："), mediaInfoWidget_);
+    audioInfoLabel_ = new QLabel(tr("音频："), mediaInfoWidget_);
+    durationLabel_ = new QLabel(tr("时长："), mediaInfoWidget_);
 
-    // 创建播放列表布局
-    QVBoxLayout* playlistLayout = new QVBoxLayout;
-    playlistLayout->addWidget(new QLabel(tr("播放列表"), this));
-    playlistLayout->addWidget(playlistWidget_);
-    
-    QHBoxLayout* playlistButtonLayout = new QHBoxLayout;
-    playlistButtonLayout->addWidget(addToPlaylistButton_);
-    playlistButtonLayout->addWidget(removeFromPlaylistButton_);
-    playlistButtonLayout->addWidget(clearPlaylistButton_);
-    playlistLayout->addLayout(playlistButtonLayout);
+    // 创建媒体信息布局
+    QVBoxLayout* infoLayout = new QVBoxLayout(mediaInfoWidget_);
+    infoLayout->addWidget(new QLabel(tr("媒体信息"), this));
+    infoLayout->addWidget(titleLabel_);
+    infoLayout->addWidget(resolutionLabel_);
+    infoLayout->addWidget(bitrateLabel_);
+    infoLayout->addWidget(codecLabel_);
+    infoLayout->addWidget(audioInfoLabel_);
+    infoLayout->addWidget(durationLabel_);
+    infoLayout->addStretch();
 
     // 创建按钮布局
     QHBoxLayout* controlLayout = new QHBoxLayout;
@@ -76,18 +80,12 @@ void VLCPlayerWindow::initUI()
     // 创建主布局
     QHBoxLayout* mainLayout = new QHBoxLayout(this);
     mainLayout->addLayout(leftLayout, 7);  // 分配更多空间给视频区域
-    mainLayout->addLayout(playlistLayout, 3);  // 分配较少空间给播放列表
+    mainLayout->addWidget(mediaInfoWidget_, 3);  // 分配较少空间给媒体信息
 
     // 连接信号和槽
     connect(selectFileButton_, &QPushButton::clicked, this, &VLCPlayerWindow::onSelectFile);
     connect(playPauseButton_, &QPushButton::clicked, this, &VLCPlayerWindow::onPlayPause);
     connect(positionSlider_, &QSlider::sliderMoved, this, &VLCPlayerWindow::onPositionChanged);
-    
-    // 播放列表相关信号连接
-    connect(addToPlaylistButton_, &QPushButton::clicked, this, &VLCPlayerWindow::onAddToPlaylist);
-    connect(playlistWidget_, &QListWidget::itemDoubleClicked, this, &VLCPlayerWindow::onPlaylistItemDoubleClicked);
-    connect(removeFromPlaylistButton_, &QPushButton::clicked, this, &VLCPlayerWindow::onRemoveFromPlaylist);
-    connect(clearPlaylistButton_, &QPushButton::clicked, this, &VLCPlayerWindow::onClearPlaylist);
 
     // 创建定时器用于更新界面
     updateTimer_ = new QTimer(this);
@@ -212,6 +210,53 @@ void VLCPlayerWindow::playFile(const QString& filePath)
         playPauseButton_->setText(tr("暂停"));
         playPauseButton_->setEnabled(true);
         positionSlider_->setEnabled(true);
+        
+        // 等待一小段时间后更新媒体信息（确保媒体已经开始播放）
+        QTimer::singleShot(500, this, &VLCPlayerWindow::updateMediaInfo);
+    }
+}
+
+void VLCPlayerWindow::updateMediaInfo()
+{
+    if (!media_) {
+        return;
+    }
+
+    // 获取媒体信息
+    QFileInfo fileInfo(QString::fromUtf8(libvlc_media_get_mrl(media_)));
+    titleLabel_->setText(tr("标题：%1").arg(fileInfo.fileName()));
+
+    // 获取时长
+    libvlc_time_t duration = libvlc_media_get_duration(media_);
+    int totalSeconds = duration / 1000;
+    int hours = totalSeconds / 3600;
+    int minutes = (totalSeconds % 3600) / 60;
+    int seconds = totalSeconds % 60;
+    durationLabel_->setText(tr("总时长：%1:%2:%3")
+        .arg(hours, 2, 10, QChar('0'))
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0')));
+
+    // 获取基本媒体信息
+    if (mediaPlayer_) {
+        // 获取视频尺寸
+        unsigned int width = 0, height = 0;
+        libvlc_video_get_size(mediaPlayer_, 0, &width, &height);
+        if (width > 0 && height > 0) {
+            resolutionLabel_->setText(tr("分辨率：%1x%2").arg(width).arg(height));
+        } else {
+            resolutionLabel_->setText(tr("分辨率：未知"));
+        }
+
+        // 设置其他信息为未知（因为不同版本的VLC API获取这些信息的方法不同）
+        codecLabel_->setText(tr("视频编码：未知"));
+        bitrateLabel_->setText(tr("码率：未知"));
+        audioInfoLabel_->setText(tr("音频：未知"));
+    } else {
+        resolutionLabel_->setText(tr("分辨率：未知"));
+        codecLabel_->setText(tr("视频编码：未知"));
+        bitrateLabel_->setText(tr("码率：未知"));
+        audioInfoLabel_->setText(tr("音频：未知"));
     }
 }
 
@@ -230,6 +275,14 @@ void VLCPlayerWindow::stop()
     positionSlider_->setEnabled(false);
     positionSlider_->setValue(0);
     timeLabel_->setText("00:00:00");
+    
+    // 清空媒体信息
+    titleLabel_->setText(tr("标题："));
+    resolutionLabel_->setText(tr("分辨率："));
+    bitrateLabel_->setText(tr("码率："));
+    codecLabel_->setText(tr("编码："));
+    audioInfoLabel_->setText(tr("音频："));
+    durationLabel_->setText(tr("时长："));
 }
 
 void VLCPlayerWindow::onPlayPause()
@@ -278,52 +331,4 @@ void VLCPlayerWindow::updateInterface()
         .arg(hours, 2, 10, QChar('0'))
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0')));
-}
-
-// 添加到播放列表
-void VLCPlayerWindow::onAddToPlaylist()
-{
-    QStringList files = QFileDialog::getOpenFileNames(this,
-        tr("选择媒体文件"),
-        QString(),
-        tr("媒体文件 (*.mp4 *.avi *.mkv *.mov *.mp3 *.wav);;所有文件 (*.*)"));
-
-    for (const QString& filePath : files) {
-        QFileInfo fileInfo(filePath);
-        QString displayName = fileInfo.fileName();
-        
-        // 检查是否已存在
-        if (!playlistMap_.contains(displayName)) {
-            playlistMap_[displayName] = filePath;
-            playlistWidget_->addItem(displayName);
-        }
-    }
-}
-
-// 播放列表项双击事件
-void VLCPlayerWindow::onPlaylistItemDoubleClicked(QListWidgetItem* item)
-{
-    if (item) {
-        QString filePath = playlistMap_[item->text()];
-        if (!filePath.isEmpty()) {
-            playFile(filePath);
-        }
-    }
-}
-
-// 从播放列表移除
-void VLCPlayerWindow::onRemoveFromPlaylist()
-{
-    QListWidgetItem* currentItem = playlistWidget_->currentItem();
-    if (currentItem) {
-        playlistMap_.remove(currentItem->text());
-        delete playlistWidget_->takeItem(playlistWidget_->row(currentItem));
-    }
-}
-
-// 清空播放列表
-void VLCPlayerWindow::onClearPlaylist()
-{
-    playlistWidget_->clear();
-    playlistMap_.clear();
 } 
