@@ -51,10 +51,16 @@ private:
     bool isPlaying_;
 
     QLabel* titleLabel_;
+    QLabel* containerLabel_;
     QLabel* resolutionLabel_;
-    QLabel* bitrateLabel_;
-    QLabel* codecLabel_;
-    QLabel* audioInfoLabel_;
+    QLabel* fpsLabel_;
+    QLabel* videoCodecLabel_;
+    QLabel* videoProfileLabel_;
+    QLabel* videoBitrateLabel_;
+    QLabel* audioCodecLabel_;
+    QLabel* audioChannelsLabel_;
+    QLabel* audioSampleRateLabel_;
+    QLabel* audioBitrateLabel_;
     QLabel* durationLabel_;
     QWidget* mediaInfoWidget_;
 };

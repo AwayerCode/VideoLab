@@ -47,21 +47,33 @@ void VLCPlayerWindow::initUI()
     mediaInfoWidget_->setStyleSheet("QLabel { color: #333333; }");
 
     // 创建媒体信息标签
-    titleLabel_ = new QLabel(tr("标题："), mediaInfoWidget_);
+    titleLabel_ = new QLabel(tr("文件名："), mediaInfoWidget_);
+    containerLabel_ = new QLabel(tr("封装格式："), mediaInfoWidget_);
     resolutionLabel_ = new QLabel(tr("分辨率："), mediaInfoWidget_);
-    bitrateLabel_ = new QLabel(tr("码率："), mediaInfoWidget_);
-    codecLabel_ = new QLabel(tr("编码："), mediaInfoWidget_);
-    audioInfoLabel_ = new QLabel(tr("音频："), mediaInfoWidget_);
+    fpsLabel_ = new QLabel(tr("帧率："), mediaInfoWidget_);
+    videoCodecLabel_ = new QLabel(tr("视频编码："), mediaInfoWidget_);
+    videoProfileLabel_ = new QLabel(tr("编码配置："), mediaInfoWidget_);
+    videoBitrateLabel_ = new QLabel(tr("视频码率："), mediaInfoWidget_);
+    audioCodecLabel_ = new QLabel(tr("音频编码："), mediaInfoWidget_);
+    audioChannelsLabel_ = new QLabel(tr("音频通道："), mediaInfoWidget_);
+    audioSampleRateLabel_ = new QLabel(tr("采样率："), mediaInfoWidget_);
+    audioBitrateLabel_ = new QLabel(tr("音频码率："), mediaInfoWidget_);
     durationLabel_ = new QLabel(tr("时长："), mediaInfoWidget_);
 
     // 创建媒体信息布局
     QVBoxLayout* infoLayout = new QVBoxLayout(mediaInfoWidget_);
     infoLayout->addWidget(new QLabel(tr("媒体信息"), this));
     infoLayout->addWidget(titleLabel_);
+    infoLayout->addWidget(containerLabel_);
     infoLayout->addWidget(resolutionLabel_);
-    infoLayout->addWidget(bitrateLabel_);
-    infoLayout->addWidget(codecLabel_);
-    infoLayout->addWidget(audioInfoLabel_);
+    infoLayout->addWidget(fpsLabel_);
+    infoLayout->addWidget(videoCodecLabel_);
+    infoLayout->addWidget(videoProfileLabel_);
+    infoLayout->addWidget(videoBitrateLabel_);
+    infoLayout->addWidget(audioCodecLabel_);
+    infoLayout->addWidget(audioChannelsLabel_);
+    infoLayout->addWidget(audioSampleRateLabel_);
+    infoLayout->addWidget(audioBitrateLabel_);
     infoLayout->addWidget(durationLabel_);
     infoLayout->addStretch();
 
@@ -222,9 +234,9 @@ void VLCPlayerWindow::updateMediaInfo()
         return;
     }
 
-    // 获取媒体信息
+    // 获取文件信息
     QFileInfo fileInfo(QString::fromUtf8(libvlc_media_get_mrl(media_)));
-    titleLabel_->setText(tr("标题：%1").arg(fileInfo.fileName()));
+    titleLabel_->setText(tr("文件名：%1").arg(fileInfo.fileName()));
 
     // 获取时长
     libvlc_time_t duration = libvlc_media_get_duration(media_);
@@ -232,31 +244,74 @@ void VLCPlayerWindow::updateMediaInfo()
     int hours = totalSeconds / 3600;
     int minutes = (totalSeconds % 3600) / 60;
     int seconds = totalSeconds % 60;
-    durationLabel_->setText(tr("总时长：%1:%2:%3")
+    durationLabel_->setText(tr("时长：%1:%2:%3")
         .arg(hours, 2, 10, QChar('0'))
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0')));
 
-    // 获取基本媒体信息
+    // 设置默认值
+    containerLabel_->setText(tr("封装格式：") + fileInfo.suffix().toUpper());
+    resolutionLabel_->setText(tr("分辨率：未知"));
+    fpsLabel_->setText(tr("帧率：未知"));
+    videoCodecLabel_->setText(tr("视频编码：未知"));
+    videoProfileLabel_->setText(tr("编码配置：未知"));
+    videoBitrateLabel_->setText(tr("视频码率：未知"));
+    audioCodecLabel_->setText(tr("音频编码：未知"));
+    audioChannelsLabel_->setText(tr("音频通道：未知"));
+    audioSampleRateLabel_->setText(tr("采样率：未知"));
+    audioBitrateLabel_->setText(tr("音频码率：未知"));
+
     if (mediaPlayer_) {
         // 获取视频尺寸
         unsigned int width = 0, height = 0;
         libvlc_video_get_size(mediaPlayer_, 0, &width, &height);
         if (width > 0 && height > 0) {
             resolutionLabel_->setText(tr("分辨率：%1x%2").arg(width).arg(height));
-        } else {
-            resolutionLabel_->setText(tr("分辨率：未知"));
         }
 
-        // 设置其他信息为未知（因为不同版本的VLC API获取这些信息的方法不同）
-        codecLabel_->setText(tr("视频编码：未知"));
-        bitrateLabel_->setText(tr("码率：未知"));
-        audioInfoLabel_->setText(tr("音频：未知"));
-    } else {
-        resolutionLabel_->setText(tr("分辨率：未知"));
-        codecLabel_->setText(tr("视频编码：未知"));
-        bitrateLabel_->setText(tr("码率：未知"));
-        audioInfoLabel_->setText(tr("音频：未知"));
+        // 获取音频音量
+        int volume = libvlc_audio_get_volume(mediaPlayer_);
+        if (volume >= 0) {
+            audioChannelsLabel_->setText(tr("音量：%1%").arg(volume));
+        }
+
+        // 获取播放进度
+        libvlc_time_t current = libvlc_media_player_get_time(mediaPlayer_);
+        if (current >= 0 && duration > 0) {
+            float progress = (float)current / duration * 100;
+            videoBitrateLabel_->setText(tr("播放进度：%.1f%%").arg(progress));
+        }
+
+        // 获取基本元数据
+        char* meta;
+        
+        // 获取标题
+        meta = libvlc_media_get_meta(media_, libvlc_meta_Title);
+        if (meta) {
+            titleLabel_->setText(tr("标题：%1").arg(QString::fromUtf8(meta)));
+            free(meta);
+        }
+
+        // 获取描述
+        meta = libvlc_media_get_meta(media_, libvlc_meta_Description);
+        if (meta) {
+            videoProfileLabel_->setText(tr("描述：%1").arg(QString::fromUtf8(meta)));
+            free(meta);
+        }
+
+        // 获取版权信息（可能包含编码信息）
+        meta = libvlc_media_get_meta(media_, libvlc_meta_Copyright);
+        if (meta) {
+            videoCodecLabel_->setText(tr("版权：%1").arg(QString::fromUtf8(meta)));
+            free(meta);
+        }
+
+        // 获取发布者信息
+        meta = libvlc_media_get_meta(media_, libvlc_meta_Publisher);
+        if (meta) {
+            audioCodecLabel_->setText(tr("发布者：%1").arg(QString::fromUtf8(meta)));
+            free(meta);
+        }
     }
 }
 
@@ -277,11 +332,17 @@ void VLCPlayerWindow::stop()
     timeLabel_->setText("00:00:00");
     
     // 清空媒体信息
-    titleLabel_->setText(tr("标题："));
+    titleLabel_->setText(tr("文件名："));
+    containerLabel_->setText(tr("封装格式："));
     resolutionLabel_->setText(tr("分辨率："));
-    bitrateLabel_->setText(tr("码率："));
-    codecLabel_->setText(tr("编码："));
-    audioInfoLabel_->setText(tr("音频："));
+    fpsLabel_->setText(tr("帧率："));
+    videoCodecLabel_->setText(tr("视频编码："));
+    videoProfileLabel_->setText(tr("编码配置："));
+    videoBitrateLabel_->setText(tr("视频码率："));
+    audioCodecLabel_->setText(tr("音频编码："));
+    audioChannelsLabel_->setText(tr("音频通道："));
+    audioSampleRateLabel_->setText(tr("采样率："));
+    audioBitrateLabel_->setText(tr("音频码率："));
     durationLabel_->setText(tr("时长："));
 }
 
