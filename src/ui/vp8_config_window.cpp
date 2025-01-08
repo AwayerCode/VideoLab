@@ -326,54 +326,50 @@ void VP8ConfigWindow::createConnections()
 
 void VP8ConfigWindow::onStartEncoding()
 {
-    if (currentOutputFile_.isEmpty()) {
-        currentOutputFile_ = QFileDialog::getSaveFileName(
-            this,
-            tr("选择输出文件"),
-            QDir::homePath(),
-            tr("WebM文件 (*.webm)")
-        );
-        if (currentOutputFile_.isEmpty()) {
-            return;
-        }
+    if (shouldStop_) {
+        return;
     }
 
-    shouldStop_ = false;
+    // 检查帧是否已生成
+    if (frameGenProgressBar_->value() != 100) {
+        QMessageBox::warning(this, tr("警告"), tr("请等待帧生成完成后再开始编码"));
+        return;
+    }
+
+    auto config = getConfigFromUI();
     startButton_->setEnabled(false);
     stopButton_->setEnabled(true);
     playButton_->setEnabled(false);
-
-    // 获取配置
-    auto config = getConfigFromUI();
-
-    // 清空日志
-    logTextEdit_->clear();
-    appendLog(tr("开始VP8编码..."));
-
-    // 重置进度条
     progressBar_->setValue(0);
-    progressBar_->setMaximum(config.frames);
-
-    // 创建编码记录
-    VP8EncodingRecord record;
-    record.timestamp = QDateTime::currentDateTime();
-    record.width = config.width;
-    record.height = config.height;
-    record.frameCount = config.frames;
-    record.preset = presetCombo_->currentText();
-    record.speed = speedCombo_->currentText().toInt();
-    record.threads = config.threads;
-    record.rateControl = rateControlCombo_->currentText();
-    record.rateValue = rateValueSpinBox_->value();
-    record.keyint = config.keyint;
-    record.qmin = config.qmin;
-    record.qmax = config.qmax;
-
-    // 运行编码测试
-    encodingThread_ = std::thread([this, config, record]() mutable {
+    logTextEdit_->clear();
+    
+    shouldStop_ = false;
+    
+    appendLog(tr("开始编码...\n"));
+    appendLog(tr("编码配置:\n"));
+    appendLog(tr("分辨率: %1x%2\n").arg(config.width).arg(config.height));
+    appendLog(tr("帧数: %1\n").arg(config.frames));
+    appendLog(tr("线程数: %1\n").arg(config.threads));
+    appendLog(tr("预设: %1\n").arg(presetCombo_->currentText()));
+    appendLog(tr("速度: %1\n").arg(speedCombo_->currentText()));
+    appendLog(tr("码率控制: %1\n").arg(rateControlCombo_->currentText()));
+    appendLog(tr("正在启动编码线程...\n"));
+    
+    // 在新线程中运行编码测试
+    if (encodingThread_.joinable()) {
+        encodingThread_.join();
+    }
+    encodingThread_ = std::thread([this, config]() {
+        appendLog(tr("正在初始化编码器...\n"));
+        
         auto result = VP8ParamTest::runTest(config,
             [this](int frame, const VP8ParamTest::TestResult& result) {
-                if (shouldStop_) return false;
+                if (shouldStop_) {
+                    appendLog(tr("\n编码已停止\n"));
+                    return false;
+                }
+
+                // 通过信号槽更新UI
                 QMetaObject::invokeMethod(this, "updateProgress",
                     Qt::QueuedConnection,
                     Q_ARG(int, frame),
@@ -382,23 +378,51 @@ void VP8ConfigWindow::onStartEncoding()
                     Q_ARG(double, result.bitrate),
                     Q_ARG(double, result.psnr),
                     Q_ARG(double, result.ssim));
-                return true;
+                
+                return !shouldStop_; // 返回false表示停止编码
             });
-            
-        record.encodingTime = result.encoding_time;
-        record.fps = result.fps;
-        record.bitrate = result.bitrate;
-        record.psnr = result.psnr;
-        record.ssim = result.ssim;
         
-        QMetaObject::invokeMethod(this, "addEncodingRecord",
-            Qt::QueuedConnection,
-            Q_ARG(VP8EncodingRecord, record));
+        // 编码完成后，在主线程中更新UI
+        QMetaObject::invokeMethod(this, [this, result, config]() {
+            QString summary = QString(
+                "\n编码完成！\n"
+                "总编码时间: %1 秒\n"
+                "平均编码速度: %2 fps\n"
+                "平均码率: %3 kbps\n"
+                "PSNR: %4\n"
+                "SSIM: %5\n")
+                .arg(result.encoding_time, 0, 'f', 2)
+                .arg(result.fps, 0, 'f', 2)
+                .arg(result.bitrate / 1000.0, 0, 'f', 2)
+                .arg(result.psnr, 0, 'f', 2)
+                .arg(result.ssim, 0, 'f', 3);
+            appendLog(summary);
+
+            // 添加到历史记录
+            VP8EncodingRecord record;
+            record.timestamp = QDateTime::currentDateTime();
+            record.width = config.width;
+            record.height = config.height;
+            record.frameCount = config.frames;
+            record.preset = presetCombo_->currentText();
+            record.speed = speedCombo_->currentIndex();
+            record.threads = config.threads;
+            record.rateControl = rateControlCombo_->currentText();
+            record.rateValue = rateValueSpinBox_->value();
+            record.keyint = config.keyint;
+            record.qmin = config.qmin;
+            record.qmax = config.qmax;
+            record.encodingTime = result.encoding_time;
+            record.fps = result.fps;
+            record.bitrate = result.bitrate;
+            record.psnr = result.psnr;
+            record.ssim = result.ssim;
+            record.outputFile = currentOutputFile_;
             
-        QMetaObject::invokeMethod(this, "onEncodingFinished",
-            Qt::QueuedConnection);
+            addEncodingRecord(record);
+            onEncodingFinished();
+        }, Qt::QueuedConnection);
     });
-    encodingThread_.detach();
 }
 
 void VP8ConfigWindow::onStopEncoding()
@@ -494,10 +518,20 @@ void VP8ConfigWindow::onSceneConfigChanged(int index)
 
 void VP8ConfigWindow::onPlayVideo()
 {
-    if (!QFile::exists(currentOutputFile_)) {
-        QMessageBox::warning(this, tr("错误"), tr("输出文件不存在"));
+    // 查找 datas 目录下最新的 webm 文件
+    QDir dataDir("datas");
+    if (!dataDir.exists()) {
+        QMessageBox::warning(this, tr("错误"), tr("datas目录不存在"));
         return;
     }
+
+    QFileInfoList files = dataDir.entryInfoList(QStringList() << "vp8_*.webm", QDir::Files, QDir::Time);
+    if (files.isEmpty()) {
+        QMessageBox::warning(this, tr("错误"), tr("没有找到可播放的视频文件"));
+        return;
+    }
+
+    currentOutputFile_ = files.first().absoluteFilePath();
 
     if (mediaPlayer_->playbackState() != QMediaPlayer::PlayingState) {
         mediaPlayer_->setSource(QUrl::fromLocalFile(currentOutputFile_));
@@ -782,9 +816,6 @@ VP8ParamTest::TestConfig VP8ConfigWindow::getConfigFromUI() const
     config.width = widthSpinBox_->value();
     config.height = heightSpinBox_->value();
     config.frames = frameCountSpinBox_->value();
-    
-    // 输出文件
-    config.output_file = currentOutputFile_.toStdString();
     
     return config;
 }

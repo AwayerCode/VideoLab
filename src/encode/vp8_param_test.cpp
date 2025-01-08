@@ -18,6 +18,31 @@ const char* VP8ParamTest::speedToString(Speed speed) {
     return std::to_string(static_cast<int>(speed)).c_str();
 }
 
+std::string VP8ParamTest::generateOutputPath(const std::string& suffix) {
+    // 获取当前工作目录
+    const char* workDir = getenv("PWD");
+    if (!workDir) {
+        std::cerr << "无法获取当前工作目录" << std::endl;
+        return "";
+    }
+    
+    // 构建输出目录路径
+    std::string outputDir = std::string(workDir) + "/datas";
+    
+    // 确保输出目录存在
+    if (system(("mkdir -p '" + outputDir + "'").c_str()) != 0) {
+        std::cerr << "无法创建输出目录: " << outputDir << std::endl;
+        return "";
+    }
+    
+    // 生成带时间戳的文件名
+    std::string outputFile = outputDir + "/vp8_" +
+                            std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) +
+                            "_" + suffix + ".webm";
+    
+    return outputFile;
+}
+
 VP8ParamTest::VP8ParamTest() = default;
 
 VP8ParamTest::~VP8ParamTest() {
@@ -285,8 +310,24 @@ VP8ParamTest::TestResult VP8ParamTest::runTest(
         return result;
     }
 
+    // 生成输出文件路径
+    std::string suffix;
+    switch (config.rate_control) {
+        case RateControl::CQ:
+            suffix = "cq_" + std::to_string(config.cq_level);
+            break;
+        case RateControl::CBR:
+            suffix = "cbr_" + std::to_string(config.bitrate / 1000000) + "m";
+            break;
+        case RateControl::VBR:
+            suffix = "vbr_" + std::to_string(config.bitrate / 1000000) + "m";
+            break;
+    }
+    suffix += "_" + std::string(presetToString(config.preset));
+    std::string outputFile = generateOutputPath(suffix);
+
     // 初始化编码器
-    if (!test.initEncoder(config, config.output_file)) {
+    if (!test.initEncoder(config, outputFile)) {
         std::cerr << "无法初始化编码器" << std::endl;
         return result;
     }
@@ -354,8 +395,6 @@ std::vector<VP8ParamTest::TestResult> VP8ParamTest::runPresetTest(
         std::cout << "测试预设: " << presetToString(preset) << std::endl;
         
         base_config.preset = preset;
-        base_config.output_file = output_prefix + "_" + presetToString(preset) + ".webm";
-        
         auto result = runTest(base_config);
         results.push_back(result);
         
@@ -395,8 +434,6 @@ std::vector<VP8ParamTest::TestResult> VP8ParamTest::runRateControlTest(
                 
                 base_config.rate_control = mode;
                 base_config.cq_level = cq;
-                base_config.output_file = output_prefix + "_" + mode_str + "_" + std::to_string(cq) + ".webm";
-                
                 auto result = runTest(base_config);
                 results.push_back(result);
                 
@@ -413,8 +450,6 @@ std::vector<VP8ParamTest::TestResult> VP8ParamTest::runRateControlTest(
                 
                 base_config.rate_control = mode;
                 base_config.bitrate = bitrate;
-                base_config.output_file = output_prefix + "_" + mode_str + "_" + std::to_string(bitrate/1000000) + "m.webm";
-                
                 auto result = runTest(base_config);
                 results.push_back(result);
                 
@@ -445,8 +480,6 @@ std::vector<VP8ParamTest::TestResult> VP8ParamTest::runQualityTest(
         
         base_config.qmin = qp;
         base_config.qmax = qp;
-        base_config.output_file = output_prefix + "_qp" + std::to_string(qp) + ".webm";
-        
         auto result = runTest(base_config);
         results.push_back(result);
         

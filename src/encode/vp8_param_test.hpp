@@ -68,7 +68,6 @@ public:
         Preset preset = Preset::GOOD;
         Speed speed = Speed::SPEED_0;
         RateControl rate_control = RateControl::VBR;
-        std::string output_file;
     };
 
     // 测试结果
@@ -129,6 +128,9 @@ protected:
     void generateFramesThreaded(const TestConfig& config, size_t thread_count);
     static void frameGenerationWorker(VP8ParamTest* self, const TestConfig& config,
                              size_t start_frame, size_t end_frame);
+
+    // 生成输出文件路径
+    static std::string generateOutputPath(const std::string& suffix);
 
 private:
     // 编码器相关
