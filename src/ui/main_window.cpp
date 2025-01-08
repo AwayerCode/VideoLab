@@ -8,6 +8,7 @@ MainWindow::MainWindow(QWidget *parent)
     , vp8ConfigWindow_(new VP8ConfigWindow(this))
     , aacConfigWindow_(new AACConfigWindow(this))
     , mp4ConfigWindow_(new MP4ConfigWindow(this))
+    , vlcPlayerWindow_(new VLCPlayerWindow(this))
 {
     setupUI();
 }
@@ -27,6 +28,7 @@ void MainWindow::setupUI()
     tabWidget_->addTab(vp8ConfigWindow_, "VP8");
     tabWidget_->addTab(aacConfigWindow_, "AAC");
     tabWidget_->addTab(mp4ConfigWindow_, "MP4");
+    tabWidget_->addTab(vlcPlayerWindow_, "VLC播放器");
 
     mainLayout->addWidget(tabWidget_);
 

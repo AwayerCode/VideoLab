@@ -25,6 +25,7 @@ set(SOURCES
     src/ui/aac_frame_view.cpp
     src/ui/mp4_config_window.cpp
     src/ui/mp4_box_view.cpp
+    src/ui/vlc_player_window.cpp
 )
 
 # 头文件
@@ -40,6 +41,7 @@ set(HEADERS
     src/ui/aac_frame_view.hpp
     src/ui/mp4_config_window.hpp
     src/ui/mp4_box_view.hpp
+    src/ui/vlc_player_window.hpp
 )
 
 # 查找依赖包
@@ -50,6 +52,9 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavutil
     libswscale
 )
+
+# 查找 VLC 库
+pkg_check_modules(VLC REQUIRED IMPORTED_TARGET libvlc)
 
 # 查找x264库
 find_library(X264_LIBRARY x264)
@@ -63,6 +68,10 @@ if(NOT VPX_LIBRARY)
     message(FATAL_ERROR "vpx library not found")
 endif()
 
+# 设置 VLC SDK 路径
+set(VLC_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/3rdparty/vlc_sdk)
+set(VLC_INCLUDE_DIR ${VLC_SDK_DIR}/include)
+
 # 添加可执行文件
 add_executable(${PROJECT_NAME}
     ${SOURCES}
@@ -72,6 +81,8 @@ add_executable(${PROJECT_NAME}
 # 包含目录
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${VLC_INCLUDE_DIR}
+    ${VLC_INCLUDE_DIRS}
 )
 
 # 链接库
@@ -82,6 +93,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     PkgConfig::FFMPEG
     ${X264_LIBRARY}
     ${VPX_LIBRARY}
+    PkgConfig::VLC
 )
 
 # 安装规则
@@ -89,4 +101,17 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# 创建输出目录
+add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins
+)
+
+# 复制 VLC 插件到输出目录
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${VLC_SDK_DIR}/plugins
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins
 ) 

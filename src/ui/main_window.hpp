@@ -6,6 +6,7 @@
 #include "vp8_config_window.hpp"
 #include "aac_config_window.hpp"
 #include "mp4_config_window.hpp"
+#include "vlc_player_window.hpp"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -23,4 +24,5 @@ private:
     VP8ConfigWindow* vp8ConfigWindow_{nullptr};
     AACConfigWindow* aacConfigWindow_{nullptr};
     MP4ConfigWindow* mp4ConfigWindow_{nullptr};
+    VLCPlayerWindow* vlcPlayerWindow_{nullptr};
 }; 
